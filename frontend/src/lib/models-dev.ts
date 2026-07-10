@@ -114,7 +114,16 @@ export function lookupModel(modelId: string | undefined): ModelInfo | null {
   const q = modelId?.trim().toLowerCase();
   if (!catalog || !q) return null;
   const qs = lastSeg(q);
+  // Prefer a catalog entry that carries a `family` — the same model id is
+  // listed under many resellers, some of which omit family (e.g. 302ai's grok
+  // entries have family=undefined). Without this preference the first hit was
+  // a family-less reseller row, so the brand lookup fell through to the
+  // reseller's logo (OpenRouter) instead of the model's own brand (xAI).
+  const withFamily = (m: ModelInfo) => m.family.trim() !== "";
   return (
+    catalog.find((m) => m.id.toLowerCase() === q && withFamily(m)) ??
+    catalog.find((m) => lastSeg(m.id.toLowerCase()) === qs && withFamily(m)) ??
+    catalog.find((m) => m.name.toLowerCase() === q && withFamily(m)) ??
     catalog.find((m) => m.id.toLowerCase() === q) ??
     catalog.find((m) => lastSeg(m.id.toLowerCase()) === qs) ??
     catalog.find((m) => m.name.toLowerCase() === q) ??
@@ -176,11 +185,22 @@ function brandOfFamily(family: string): string | null {
 
 /** Brand provider id for a model's API id (via the catalog's family), or null.
  * Public so startup can prefetch brand logos for the user's configured models
- * before any picker renders. */
+ * before any picker renders. Falls back to a name-based heuristic if the
+ * catalog row has no family (some resellers omit it) so e.g. a "grok-4.5"
+ * model id still resolves to xAI even when the matched row is family-less. */
 export function brandForModelId(modelId: string): string | null {
   const info = lookupModel(modelId);
-  if (!info) return null;
-  return brandOfFamily(info.family);
+  if (info) {
+    const b = brandOfFamily(info.family);
+    if (b) return b;
+  }
+  // Heuristic on the id/name when the catalog match had no family — the
+  // family prefixes double as id/name stems (grok-, glm-, kimi-, …).
+  const hay = `${modelId} ${info?.name ?? ""}`.toLowerCase();
+  for (const { prefix, brand } of FAMILY_BRAND) {
+    if (hay.includes(prefix)) return brand;
+  }
+  return info ? info.provider : null;
 }
 
 // HTTP cache of already-prefetched logo URLs so we never fetch the same brand
