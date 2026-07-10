@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { EventsOn } from "../wailsjs/runtime";
@@ -14,7 +14,7 @@ import "./App.css";
 export default function App() {
   const termRef = useRef<HTMLDivElement>(null);
   const idRef = useRef<string>("");
-  const [status, setStatus] = useState("opening…");
+  // Status is debug-only here; not rendered in the spike shell.
 
   useEffect(() => {
     if (!termRef.current) return;
@@ -42,16 +42,15 @@ export default function App() {
     OpenPTY("", cols, rows)
       .then((id: string) => {
         idRef.current = id;
-        setStatus(`pty ${id} live`);
         // Stream: ConPTY output → xterm writes.
         EventsOn("pty:" + id, (data: string) => term.write(data));
-        EventsOn("pty:" + id + ":done", () => setStatus(`pty ${id} closed`));
+        EventsOn("pty:" + id + ":done", () => {});
         // Keystrokes → PTY stdin.
         const disp = term.onData((d) => WritePTY(id, d).catch(() => {}));
         // Keep the dispose handle for cleanup.
         (term as any)._disp = disp;
       })
-      .catch((e: unknown) => setStatus("open failed: " + String(e)));
+      .catch((e: unknown) => console.error("open pty:", e));
 
     // Resize the PTY when the pane geometry changes.
     const ro = new ResizeObserver(() => {
@@ -71,9 +70,6 @@ export default function App() {
     <div id="App" style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <TitleBar />
       <div className="term-container" ref={termRef} />
-      <div style={{ height: 22, padding: "0 12px", fontSize: 11, color: "var(--faint)", background: "var(--bg)" }}>
-        {status}
-      </div>
     </div>
   );
 }
