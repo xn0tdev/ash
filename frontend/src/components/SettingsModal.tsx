@@ -224,14 +224,57 @@ interface SettingsModalProps {
   onClose: () => void;
 }
 
+const APPEARANCE_ICON = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="5" />
+    <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+  </svg>
+);
+const LAYOUT_ICON = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="2" />
+    <path d="M9 3v18" />
+  </svg>
+);
+const SECTIONS_ICON = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
+  </svg>
+);
+const TERMINAL_ICON = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="m4 17 6-6-6-6" />
+    <path d="M12 19h8" />
+  </svg>
+);
+const AGENTS_ICON = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="11" width="18" height="10" rx="2" />
+    <circle cx="12" cy="5" r="2" />
+    <path d="M12 7v4M8 16h.01M16 16h.01" />
+  </svg>
+);
+const SHORTCUTS_ICON = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+    <path d="M9 9h.01M15 15h.01" />
+  </svg>
+);
+const ABOUT_ICON = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <path d="M12 16v-4M12 8h.01" />
+  </svg>
+);
+
 const CATEGORIES = [
-  { id: "appearance", label: "Appearance" },
-  { id: "layout", label: "Layout" },
-  { id: "sections", label: "Sidebar sections" },
-  { id: "terminal", label: "Terminal" },
-  { id: "agents", label: "Agents" },
-  { id: "shortcuts", label: "Shortcuts" },
-  { id: "about", label: "About" },
+  { id: "appearance", label: "Appearance", icon: APPEARANCE_ICON },
+  { id: "layout", label: "Layout", icon: LAYOUT_ICON },
+  { id: "sections", label: "Sidebar sections", icon: SECTIONS_ICON },
+  { id: "terminal", label: "Terminal", icon: TERMINAL_ICON },
+  { id: "agents", label: "Agents", icon: AGENTS_ICON },
+  { id: "shortcuts", label: "Shortcuts", icon: SHORTCUTS_ICON },
+  { id: "about", label: "About", icon: ABOUT_ICON },
 ] as const;
 
 type CategoryId = (typeof CATEGORIES)[number]["id"];
@@ -634,15 +677,21 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
           )}
         </div>
         <div className="settings-cats">
-          {CATEGORIES.map((c) => (
-            <button
-              key={c.id}
-              className={`nav-item${cat === c.id ? " active" : ""}`}
-              onClick={() => setCat(c.id)}
-            >
-              {c.label}
-            </button>
-          ))}
+          {CATEGORIES.map((c) => {
+            const Icon = c.icon;
+            return (
+              <button
+                key={c.id}
+                className={`nav-item${cat === c.id ? " active" : ""}`}
+                onClick={() => setCat(c.id)}
+              >
+                <span className="nav-item-icon">
+                  <Icon />
+                </span>
+                {c.label}
+              </button>
+            );
+          })}
         </div>
       </nav>
 

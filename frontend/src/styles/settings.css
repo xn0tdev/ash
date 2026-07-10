@@ -13,9 +13,17 @@
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  padding: 16px 12px;
+  padding: 10px 8px 10px;
   overflow-y: auto;
   background: var(--bg);
+  scrollbar-width: none;
+}
+.settings-nav::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+.settings-nav svg {
+  shape-rendering: geometricPrecision;
 }
 
 .settings-back {
@@ -23,15 +31,15 @@
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 8px 10px;
+  height: 30px;
+  padding: 0 8px;
   border: none;
-  /* squircle compensation: radius multiplied so the corner reads as intended. */
-  border-radius: 12px;
+  border-radius: 10px;
   corner-shape: squircle;
   background: transparent;
-  color: var(--muted);
+  color: var(--text);
   font-family: inherit;
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 500;
   cursor: default;
   transition: background-color 0.1s ease, color 0.1s ease;
@@ -44,37 +52,51 @@
 
 .settings-back svg {
   flex-shrink: 0;
+  width: 17px;
+  height: 17px;
 }
 
 .settings-cats {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  margin-top: 16px;
+  gap: 1px;
+  margin-top: 8px;
 }
 
 .nav-item {
-  display: block;
-  text-align: left;
-  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 8px;
   border: none;
-  border-radius: 12px;
+  border-radius: 10px;
   corner-shape: squircle;
   background: transparent;
-  color: var(--muted);
+  color: var(--text);
   font-family: inherit;
-  font-size: 13px;
+  font-size: 12.5px;
+  text-align: left;
   cursor: default;
   transition: background-color 0.1s ease, color 0.1s ease;
 }
 
+.nav-item-icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
 .nav-item:hover {
   background: var(--hover);
-  color: var(--text);
 }
 
 .nav-item.active {
   background: var(--hover);
+}
+
+.nav-item.active .nav-item-icon {
   color: var(--text);
 }
 
@@ -180,14 +202,14 @@
 .settings-search-wrap {
   position: relative;
   z-index: 50;
-  margin-top: 10px;
-  margin-bottom: 12px;
+  margin-top: 6px;
+  margin-bottom: 6px;
 }
 
 .settings-search {
   position: relative;
   z-index: 2;
-  height: 32px;
+  height: 30px;
   display: flex;
   align-items: center;
   gap: 8px;
