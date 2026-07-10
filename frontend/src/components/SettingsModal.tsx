@@ -554,53 +554,53 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
       </nav>
 
       <div className="settings-content" data-tauri-drag-region>
-          <div className="settings-search-wrap" data-tauri-drag-region>
-            <div className="settings-search">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <circle cx="11" cy="11" r="7" />
-                <path d="m20 20-3.5-3.5" />
-              </svg>
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search settings…"
-                spellCheck={false}
-                onKeyDown={(e) => {
-                  if (e.key === "Escape" && search) {
-                    e.stopPropagation();
-                    setSearch("");
-                  }
-                }}
-              />
-              {search && (
-                <button type="button" className="settings-search-clear" onClick={() => setSearch("")} aria-label="Clear search">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
-                    <path d="M18 6 6 18M6 6l12 12" />
-                  </svg>
-                </button>
-              )}
-            </div>
-            {searchQuery && (
-              <div className="settings-search-results">
-                {searchResults.length ? (
-                  searchResults.map((item) => (
-                    <button key={`${item.cat}:${item.label}`} type="button" className="settings-search-result" onClick={() => jumpToSearchResult(item.cat)}>
-                      <span className="settings-search-result-main">
-                        <span>{item.label}</span>
-                        <small>{item.hint}</small>
-                      </span>
-                      <span className="settings-search-result-cat">
-                        {CATEGORIES.find((c) => c.id === item.cat)?.label}
-                      </span>
-                    </button>
-                  ))
-                ) : (
-                  <div className="settings-search-empty">No settings found</div>
+          <div className="settings-inner" data-tauri-drag-region>
+            <div className="settings-search-wrap" data-tauri-drag-region>
+              <div className="settings-search">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="m20 20-3.5-3.5" />
+                </svg>
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search settings…"
+                  spellCheck={false}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape" && search) {
+                      e.stopPropagation();
+                      setSearch("");
+                    }
+                  }}
+                />
+                {search && (
+                  <button type="button" className="settings-search-clear" onClick={() => setSearch("")} aria-label="Clear search">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+                      <path d="M18 6 6 18M6 6l12 12" />
+                    </svg>
+                  </button>
                 )}
               </div>
-            )}
-          </div>
-          <div className="settings-inner" data-tauri-drag-region>
+              {searchQuery && (
+                <div className="settings-search-results">
+                  {searchResults.length ? (
+                    searchResults.map((item) => (
+                      <button key={`${item.cat}:${item.label}`} type="button" className="settings-search-result" onClick={() => jumpToSearchResult(item.cat)}>
+                        <span className="settings-search-result-main">
+                          <span>{item.label}</span>
+                          <small>{item.hint}</small>
+                        </span>
+                        <span className="settings-search-result-cat">
+                          {CATEGORIES.find((c) => c.id === item.cat)?.label}
+                        </span>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="settings-search-empty">No settings found</div>
+                  )}
+                </div>
+              )}
+            </div>
             {cat === "appearance" && (
               <section>
                 <h3>Appearance</h3>

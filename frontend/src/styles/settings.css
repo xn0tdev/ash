@@ -172,8 +172,8 @@
 }
 
 .settings-search-wrap {
-  width: min(760px, 100%);
-  margin: 0 auto 10px;
+  width: 100%;
+  margin: 0 0 34px;
 }
 
 .settings-search {
