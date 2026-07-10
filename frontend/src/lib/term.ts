@@ -72,6 +72,25 @@ let focusedTermId: string | null = null;
 let lastWrittenClipboard = "";
 let clipboardWatcherInit = false;
 
+// Paste-intent window: set when a paste keystroke (Ctrl+V / Ctrl+Shift+V) is
+// seen in a focused terminal, cleared after ~1.2s. The clipboard watcher only
+// auto-pastes while this is true, so a clipboard change caused by copying text
+// elsewhere (Discord, Telegram, …) does NOT get injected into the terminal —
+// only a change that coincides with a paste keystroke directed at the terminal
+// does. The window is wider than the 400ms poll interval so it covers Wispr
+// Flow setting the clipboard before/after it simulates the keystroke.
+let expectingPaste = false;
+let expectingPasteTimer: ReturnType<typeof setTimeout> | null = null;
+
+function markExpectingPaste(): void {
+  expectingPaste = true;
+  if (expectingPasteTimer) clearTimeout(expectingPasteTimer);
+  expectingPasteTimer = setTimeout(() => {
+    expectingPaste = false;
+    expectingPasteTimer = null;
+  }, 1200);
+}
+
 /** Set by TerminalPane when it gains/loses focus so the watcher knows where to
  *  route an auto-paste. null when no terminal is focused (chat, explorer, …). */
 export function setFocusedTerminal(id: string | null) {
@@ -92,9 +111,17 @@ function initClipboardWatcher(): void {
   listen<{ text: string }>("clipboard:changed", (e) => {
     const text = e.payload?.text ?? "";
     if (!text || !focusedTermId) return;
+    if (!expectingPaste) return; // no paste keystroke directed here → it's a copy elsewhere, ignore
     if (text === lastWrittenClipboard) return; // our own copy — skip
     const id = focusedTermId;
     if (!sessions.has(id)) return; // session may have been disposed
+    // Consume the intent so a second clipboard change within the window
+    // doesn't double-paste.
+    expectingPaste = false;
+    if (expectingPasteTimer) {
+      clearTimeout(expectingPasteTimer);
+      expectingPasteTimer = null;
+    }
     used.add(id);
     ptyWrite(id, text);
   }).catch(() => {});
@@ -353,6 +380,11 @@ function attachRenderer(session: TermSession, host: HTMLElement, useWebgl = true
     // We only suppress Ctrl+V when the terminal has no host (defensive —
     // shouldn't happen) so xterm never sends the 0x16 literal-next byte.
     if (e.ctrlKey && !e.altKey && e.code === "KeyV") {
+      // Signal paste-intent for the OS clipboard watcher (so a Wispr Flow
+      // clipboard change within ~1.2s is routed here as a paste). The native
+      // paste event still flows for the sync DOM listener; whichever delivers
+      // first wins, and the watcher consumes the intent so it doesn't fire twice.
+      markExpectingPaste();
       return true; // let the native paste event flow → sync listener handles it
     }
     // App-level shortcuts pass through untouched.
@@ -398,6 +430,14 @@ function attachRenderer(session: TermSession, host: HTMLElement, useWebgl = true
       if (text) {
         e.preventDefault();
         e.stopImmediatePropagation();
+        // Consume paste-intent so the OS clipboard watcher doesn't also paste
+        // the same text (the watcher fires on the clipboard change this paste
+        // came from, ~400ms later).
+        if (expectingPasteTimer) {
+          clearTimeout(expectingPasteTimer);
+          expectingPasteTimer = null;
+        }
+        expectingPaste = false;
         used.add(id);
         ptyWrite(id, text);
       }
