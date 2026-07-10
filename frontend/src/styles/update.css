@@ -35,7 +35,6 @@
 .update-modal {
   width: 340px;
   padding: 24px 22px 22px;
-  border: none; /* drop the default .modal border */
   text-align: center;
 }
 
