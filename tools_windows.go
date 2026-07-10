@@ -84,13 +84,13 @@ func (Tools) SshHosts() []string {
 	if home == "" {
 		h, err := os.UserHomeDir()
 		if err != nil {
-			return nil
+			return []string{}
 		}
 		home = h
 	}
 	b, err := os.ReadFile(filepath.Join(home, ".ssh", "config"))
 	if err != nil {
-		return nil
+		return []string{}
 	}
 	// Always return a non-nil slice (empty = []); nil would serialize to JSON
 	// `null` in Wails and crash the frontend's .map.

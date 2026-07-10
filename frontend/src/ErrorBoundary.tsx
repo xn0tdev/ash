@@ -15,7 +15,15 @@ export default class ErrorBoundary extends Component<{ children: ReactNode }, St
     return { error };
   }
   componentDidCatch(error: Error, info: { componentStack: string }) {
-    console.error("render error:", error, info.componentStack);
+    const msg =
+      String(error) + "\n\n" + (error.stack ?? "") + "\n\n--- component stack ---\n" + info.componentStack;
+    console.error("render error:", msg);
+    // Persist to a crash log so a headless run (no devtools) can still surface
+    // the cause — the GUI shows red text but I can't read the screen from the
+    // shell. Routed through the Go Fs binding to ~/ash-wails/crash.log.
+    import("../wailsjs/go/main/Fs")
+      .then((m) => m.WriteText("./crash.log", msg))
+      .catch(() => {});
     this.setState({ componentStack: info.componentStack });
   }
   render() {

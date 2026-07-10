@@ -53,11 +53,11 @@ func (Tools) FindEditors() []string {
 func (Tools) SshHosts() []string {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return nil
+		return []string{}
 	}
 	b, err := os.ReadFile(filepath.Join(home, ".ssh", "config"))
 	if err != nil {
-		return nil
+		return []string{}
 	}
 	hosts := []string{}
 	for _, line := range strings.Split(string(b), "\n") {

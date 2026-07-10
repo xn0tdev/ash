@@ -24,7 +24,9 @@ export function invoke<T = unknown>(cmd: string, args?: Record<string, unknown>)
     case "delete_path":
       return Fs.DeletePath(args?.path as string) as Promise<T>;
     case "list_dir":
-      return Fs.ListDir(args?.path as string) as Promise<T>;
+      return (Fs.ListDir(args?.path as string) as Promise<unknown[]>).then(
+        (r) => (r ?? []) as unknown as T,
+      );
 
     // ── git ──────────────────────────────────────────────────
     case "git_branch":
@@ -36,15 +38,17 @@ export function invoke<T = unknown>(cmd: string, args?: Record<string, unknown>)
 
     // ── tools ────────────────────────────────────────────────
     case "detect_bins":
-      return Tools.DetectBins(args?.names as string[]) as Promise<T>;
+      return Tools.DetectBins(args?.names as string[]).then(
+        (r: string[] | null) => (r ?? []) as unknown as T,
+      );
     case "ssh_hosts":
-      return Tools.SshHosts() as Promise<T>;
+      return Tools.SshHosts().then((r: string[] | null) => (r ?? []) as unknown as T);
     case "open_in":
       return Tools.OpenIn(args?.app as string, args?.path as string, args?.isDir as boolean) as Promise<T>;
     case "resolve_bash":
       return Promise.resolve(Tools.ResolveBash() as unknown as T);
     case "find_editors":
-      return Tools.FindEditors() as Promise<T>;
+      return Tools.FindEditors().then((r: string[] | null) => (r ?? []) as unknown as T);
 
     // ── pty ──────────────────────────────────────────────────
     case "pty_spawn":
@@ -67,7 +71,9 @@ export function invoke<T = unknown>(cmd: string, args?: Record<string, unknown>)
     case "sandbox_copy":
       return Sandbox.Copy(args?.source as string) as Promise<T>;
     case "sandbox_changes":
-      return Sandbox.Changes(args?.sandbox as string, args?.project as string) as Promise<T>;
+      return (Sandbox.Changes(args?.sandbox as string, args?.project as string) as Promise<unknown[]>).then(
+        (r) => (r ?? []) as unknown as T,
+      );
     case "sandbox_merge":
       return Sandbox.Merge(args?.sandbox as string, args?.project as string, args?.files as string[]) as Promise<T>;
     case "sandbox_remove":

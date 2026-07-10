@@ -31,7 +31,7 @@ func (Sandbox) Copy(source string) (SandboxInfo, error) {
 }
 
 func (Sandbox) Changes(sandbox, project string) ([]FileChange, error) {
-	return nil, fmt.Errorf("sandbox not yet ported (phase 5)")
+	return []FileChange{}, fmt.Errorf("sandbox not yet ported (phase 5)")
 }
 
 func (Sandbox) Merge(sandbox, project string, files []string) (int, error) {
