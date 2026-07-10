@@ -31,6 +31,12 @@ func main() {
 		// near-black to match vercel-dark — avoids a white flash pre-paint.
 		BackgroundColour: &options.RGBA{R: 10, G: 10, B: 10, A: 255},
 		Frameless:        true,
+		// Wails frameless drag: an element with the CSS var
+		// (--wails-draggable: drag) becomes a window drag handle. The property
+		// and value must be declared here (the default only kicks in with these
+		// set on Windows). Value unquoted in the CSS so the matcher sees `drag`.
+		CSSDragProperty: "--wails-draggable",
+		CSSDragValue:    "drag",
 		OnStartup:        app.startup,
 		OnShutdown:       app.shutdown,
 		Bind: []interface{}{
