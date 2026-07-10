@@ -47,11 +47,13 @@ git tags `vX.Y.Z`; each tag triggers a GitHub Actions build that uploads
 ## Project layout
 
 ```
-*.go              # Wails backend: ConPTY (pty_*.go), fs, git, tools, sandbox, updater
+main.go              # entry point: embeds frontend/dist, calls app.Run(assets)
+internal/app/        # Wails backend: ConPTY (pty_*.go), fs, git, tools, sandbox,
+                     #   updater, + Run() wiring + bound structs (App/Pty/...)
 frontend/src/
   App.tsx         # top-level state + tab/workspace wiring
   components/     # TitleBar, Sidebar, AgentThread, TerminalPane, modals, Explorer
-  lib/            # term sessions, agent-engine (loop/providers/tools/skills), settings, pty
+  lib/            # term sessions, agent-engine (loop/providers/tools/skills), settings, pty, updater
   shim/           # @tauri-apps/* → Wails compatibility shims
 build/windows/    # NSIS installer + icon
 ```

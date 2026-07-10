@@ -1,6 +1,6 @@
 // Tauri → Wails shim for @tauri-apps/plugin-clipboard-manager. Routes to the
 // Go Tools.ClipboardGetText/SetText (Wails runtime clipboard).
-import * as Tools from "../../wailsjs/go/main/Tools";
+import * as Tools from "../../wailsjs/go/app/Tools";
 
 export async function readText(): Promise<string> {
   return Tools.ClipboardGetText().catch(() => "");

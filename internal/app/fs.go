@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"fmt"
@@ -9,7 +9,7 @@ import (
 )
 
 // Fs ports Ash's src-tauri/src/fs.rs to Go. Every exported method is auto-bound
-// to the frontend (frontend/wailsjs/go/main/Fs.ts), and the Tauri shim
+// to the frontend (frontend/wailsjs/go/app/Fs.ts), and the Tauri shim
 // (src/lib/wails-shim.ts) routes invoke("read_text", …) → Fs.ReadText(…), so
 // the ~30 files that call invoke() need no edits.
 

@@ -1,7 +1,7 @@
 // Tauri → Wails shim for @tauri-apps/api/path. Ash only uses homeDir(); the
 // Go side (Fs.HomeDir) returns it. The other path helpers are unused but kept
 // as thin wrappers so any importer compiles.
-import * as Fs from "../../wailsjs/go/main/Fs";
+import * as Fs from "../../wailsjs/go/app/Fs";
 
 export async function homeDir(): Promise<string> {
   return Fs.HomeDir();

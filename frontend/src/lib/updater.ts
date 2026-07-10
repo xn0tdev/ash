@@ -5,14 +5,14 @@
 // calls + event stream into a tiny reactive store the UI subscribes to.
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { main } from "../../wailsjs/go/models";
+import type { app } from "../../wailsjs/go/models";
 
 export type UpdateStage = "idle" | "checking" | "available" | "downloading" | "downloaded" | "installing" | "restarting" | "error" | "up-to-date";
 
 export interface UpdateState {
   stage: UpdateStage;
   /** Latest release found by CheckUpdate (null until a check succeeds). */
-  release: main.UpdateRelease | null;
+  release: app.UpdateRelease | null;
   /** 0-100 during downloading; 100 once downloaded. */
   percent: number;
   downloaded: number;
@@ -93,9 +93,9 @@ export async function checkForUpdate(): Promise<UpdateState> {
     const r = (await invoke<UpdateReleaseInfo>("check_update"));
     checkedThisSession = true;
     if (r.hasUpdate) {
-      set({ stage: "available", release: r as unknown as main.UpdateRelease, error: null });
+      set({ stage: "available", release: r as unknown as app.UpdateRelease, error: null });
     } else {
-      set({ stage: "up-to-date", release: r as unknown as main.UpdateRelease, error: null });
+      set({ stage: "up-to-date", release: r as unknown as app.UpdateRelease, error: null });
     }
     return state;
   } catch (err) {

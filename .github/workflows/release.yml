@@ -44,7 +44,7 @@ jobs:
 
       - name: Build Ash.exe (versioned)
         run: |
-          wails build -ldflags "-X main.Version=${{ steps.ver.outputs.version }} -X main.Commit=${{ github.sha }}"
+          wails build -ldflags "-X ash-wails/internal/app.Version=${{ steps.ver.outputs.version }} -X ash-wails/internal/app.Commit=${{ github.sha }}"
 
       - name: Stage asset
         shell: pwsh

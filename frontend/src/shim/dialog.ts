@@ -1,7 +1,7 @@
 // Tauri → Wails shim for @tauri-apps/plugin-dialog. Ash uses `open` (file/dir
 // picker) and `ask` (yes/no confirm). Both route to Tools methods on the Go
 // side which call Wails runtime dialogs.
-import * as Tools from "../../wailsjs/go/main/Tools";
+import * as Tools from "../../wailsjs/go/app/Tools";
 
 export async function open(
   opts?: { directory?: boolean; multiple?: boolean; title?: string },

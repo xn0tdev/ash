@@ -1,15 +1,15 @@
 // Tauri → Wails shim: emulates @tauri-apps/api/core `invoke` so the ~30 files
 // that call invoke("read_text", { path }) keep working unchanged. Each command
 // routes to the corresponding Go binding method (auto-generated in
-// frontend/wailsjs/go/main/*). Wails bindings are async and return Promises,
+// frontend/wailsjs/go/app/*). Wails bindings are async and return Promises,
 // matching invoke()'s contract.
-import * as Fs from "../../wailsjs/go/main/Fs";
-import * as Git from "../../wailsjs/go/main/Git";
-import * as Tools from "../../wailsjs/go/main/Tools";
-import * as Sandbox from "../../wailsjs/go/main/Sandbox";
-import * as Pty from "../../wailsjs/go/main/Pty";
-import * as Updater from "../../wailsjs/go/main/Updater";
-import * as AppBinding from "../../wailsjs/go/main/App";
+import * as Fs from "../../wailsjs/go/app/Fs";
+import * as Git from "../../wailsjs/go/app/Git";
+import * as Tools from "../../wailsjs/go/app/Tools";
+import * as Sandbox from "../../wailsjs/go/app/Sandbox";
+import * as Pty from "../../wailsjs/go/app/Pty";
+import * as Updater from "../../wailsjs/go/app/Updater";
+import * as AppBinding from "../../wailsjs/go/app/App";
 
 // invoke<T>(cmd, args) → Promise<T>. Args is a flat object (Tauri convention);
 // Wails binding methods take positional args, so each case maps the named

@@ -2,7 +2,7 @@
 // BrowserOpenURL; openPath uses the Go Tools.OpenIn("explorer", …) to reveal
 // a file / open a folder natively (Windows explorer.exe /select,).
 import { BrowserOpenURL } from "../../wailsjs/runtime";
-import * as Tools from "../../wailsjs/go/main/Tools";
+import * as Tools from "../../wailsjs/go/app/Tools";
 
 export async function openUrl(url: string): Promise<void> {
   BrowserOpenURL(url);
