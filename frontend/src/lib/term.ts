@@ -261,8 +261,25 @@ function attachRenderer(session: TermSession, host: HTMLElement, useWebgl = true
       writeText(term.getSelection()).catch(() => {});
       return false;
     }
-    // Paste (Ctrl+V / Ctrl+Shift+V) is left to the browser's native paste
-    // event, which xterm handles once — intercepting it here double-pastes.
+    // Paste: Ctrl+V / Ctrl+Shift+V. xterm's default forwards Ctrl+V as the
+    // 0x16 "literal-next-char" control byte to the pty — NOT a paste — so
+    // keyboard paste never inserted anything, and external dictation apps
+    // (Wispr Flow) that inject via clipboard + a synthetic keystroke couldn't
+    // paste either. Intercept and read the clipboard through the native
+    // (Tauri) plugin, which bypasses the flaky browser clipboard API in the
+    // Wails webview, then write the text straight to the pty. Returning
+    // false makes xterm preventDefault the keydown — so the browser's native
+    // paste event never fires and there's no double-paste (we own it).
+    if (e.ctrlKey && !e.altKey && e.code === "KeyV") {
+      readText()
+        .then((t) => {
+          if (!t) return;
+          used.add(id);
+          ptyWrite(id, t);
+        })
+        .catch(() => {});
+      return false;
+    }
     // App-level shortcuts pass through untouched.
     if (
       e.ctrlKey &&
