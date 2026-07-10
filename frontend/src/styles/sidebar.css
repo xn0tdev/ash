@@ -185,7 +185,7 @@
 .workspaces-head-left {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 2px;
   min-width: 0;
 }
 
@@ -200,16 +200,31 @@
   width: 18px;
   height: 18px;
   opacity: 0;
-  transform: translateY(1px);
+  transform: translateX(-2px) scale(0.88);
   pointer-events: none;
-  transition: opacity 0.12s ease, color 0.1s ease, transform 0.12s ease;
+  transition:
+    opacity 0.14s ease,
+    color 0.1s ease,
+    transform 0.16s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.workspaces-collapse svg {
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .workspaces-header:hover .workspaces-collapse:not(:disabled),
 .workspaces-header:focus-within .workspaces-collapse:not(:disabled) {
-  opacity: 1;
-  transform: translateY(0);
+  opacity: 0.72;
+  transform: translateX(0) scale(1);
   pointer-events: auto;
+}
+
+.workspaces-collapse:hover:not(:disabled) {
+  opacity: 1;
+}
+
+.workspaces-collapse:active:not(:disabled) {
+  transform: translateX(0) scale(0.94);
 }
 
 .workspaces-collapse.closed svg {
@@ -300,6 +315,7 @@
 
 .tab-icon {
   display: flex;
+  align-items: center;
   justify-content: center;
   width: 16px;
   color: var(--icon);
@@ -326,7 +342,7 @@
 .ws-folder {
   position: relative;
   width: 16px;
-  height: 20px;
+  height: 16px;
 }
 
 /* Both folder states stacked; cross-fade via alpha on open/close. Centered
@@ -335,7 +351,7 @@
    separate raster layer — plain top/left keeps it pixel-snapped and crisp. */
 .ws-folder svg {
   position: absolute;
-  top: 1px;
+  top: -1px;
   left: -1px;
   width: 18px;
   height: 18px;
