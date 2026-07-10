@@ -1,0 +1,220 @@
+/* ── Command palette ───────────────────────────────────── */
+.palette-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 15vh;
+  /* macOS Spotlight: dim + blur the whole app behind the panel */
+  background: rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  animation: sp-fade 0.18s ease;
+}
+.palette-overlay.closing {
+  animation: paletteOverlayOut 0.16s ease forwards;
+  pointer-events: none;
+}
+@keyframes paletteOverlayOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+.palette-overlay.closing .palette {
+  animation: paletteOut 0.16s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+@keyframes paletteOut {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.96);
+  }
+}
+
+.palette {
+  width: 580px;
+  max-width: 92vw;
+  max-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  /* frosted translucent card over the blurred backdrop */
+  background: color-mix(in srgb, var(--raise) 72%, transparent);
+  backdrop-filter: blur(30px) saturate(1.8);
+  -webkit-backdrop-filter: blur(30px) saturate(1.8);
+  border-radius: 24px;
+  corner-shape: squircle;
+  box-shadow:
+    0 30px 80px rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  animation: paletteIn 0.24s cubic-bezier(0.32, 1.35, 0.5, 1);
+}
+@keyframes paletteIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.palette-search {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 56px;
+  padding: 0 16px 0 18px;
+  flex-shrink: 0;
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.08);
+}
+.palette-search-ico {
+  flex-shrink: 0;
+  color: var(--faint);
+}
+.palette-input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+  outline: none;
+}
+.palette-input::placeholder {
+  color: var(--faint);
+}
+.palette-esc {
+  flex-shrink: 0;
+  padding: 4px 9px;
+  border-radius: 9px;
+  corner-shape: squircle;
+  background: rgba(255, 255, 255, 0.03);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+  font-family: inherit;
+  font-size: 10.5px;
+  color: var(--faint);
+  letter-spacing: 0.03em;
+}
+
+.palette-list {
+  position: relative;
+  overflow-y: auto;
+  /* small breathing room so the selection isn't flush top/bottom */
+  padding: 4px 7px 6px;
+  /* keyboard nav (scrollIntoView) leaves the SAME gap as manual scrolling, so
+     arrowing to the first/last row doesn't butt it against the edge */
+  scroll-padding: 10px 0;
+}
+/* custom slim scrollbar — a thin floating pill, inset from the panel edge via
+   a transparent border + padding-box clip (matches the app's rounded chrome) */
+.palette-list::-webkit-scrollbar {
+  width: 10px;
+}
+.palette-list::-webkit-scrollbar-track {
+  background: transparent;
+  /* inset the whole scrollbar from the panel's rounded top/bottom corners so
+     the thumb never pokes past the squircle */
+  margin: 12px 0;
+}
+.palette-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 5px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+.palette-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.26);
+  background-clip: padding-box;
+}
+/* the highlight glides smoothly between rows on arrow-key navigation */
+.palette-highlight {
+  position: absolute;
+  left: 7px;
+  right: 7px;
+  top: 0;
+  z-index: 0;
+  border-radius: 13px;
+  corner-shape: squircle;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  transition:
+    transform 0.19s cubic-bezier(0.32, 0.72, 0, 1),
+    height 0.19s cubic-bezier(0.32, 0.72, 0, 1);
+  pointer-events: none;
+}
+
+/* Apple-style section header: sentence case, soft secondary gray, no
+   letter-spaced all-caps "eyebrow" look. */
+.palette-head {
+  padding: 10px 12px 4px;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  text-transform: none;
+  color: var(--faint);
+}
+
+.palette-item {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 11px;
+  border: none;
+  border-radius: 13px;
+  corner-shape: squircle;
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  cursor: default;
+  text-align: left;
+}
+
+.palette-ico {
+  display: flex;
+  flex-shrink: 0;
+  color: var(--icon);
+}
+
+/* selected row's own bg is off — the sliding highlight provides it */
+.palette-item.sel {
+  background: transparent;
+}
+
+.palette-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.palette-sub {
+  flex-shrink: 0;
+  font-size: 11.5px;
+  color: var(--faint);
+}
+
+.palette-empty {
+  padding: 18px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--faint);
+}

@@ -1,0 +1,127 @@
+:root {
+  color-scheme: dark;
+  /* Palette vars are set at runtime by applyAppTheme(); these are fallbacks. */
+  --bg: #0a0a0a;
+  --surface: #151515;
+  --raise: #1e1e1e;
+  --border: rgba(255, 255, 255, 0.08);
+  --text: #ececec;
+  --muted: #a6a6a6;
+  --faint: #707070;
+  --icon: #b4b4b4;
+  --hover: rgba(255, 255, 255, 0.055);
+  /* Whole-UI scale, applied to .app (compensated so it still fills the window).
+     Set at runtime from settings; 1 = 100%. */
+  --ui-zoom: 1;
+
+  font-family: "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui,
+    sans-serif;
+  font-size: 13px;
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  /* never let the browser fake bold — only use real loaded weights */
+  font-synthesis: none;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Hide the fact this is a WebView — behave like a native app. */
+*:focus,
+*:focus-visible {
+  outline: none;
+}
+
+a,
+img,
+svg {
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
+html {
+  overscroll-behavior: none;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: var(--bg);
+  user-select: none;
+  cursor: default;
+}
+
+/* Subtle hover feedback + quick, native-feeling pop/fade for popovers.
+   Kept short (≤130ms) and transform-light — no web-style panel slides. */
+.tab,
+.side-row,
+.side-action,
+.tab-new,
+.tab-close,
+.row-btn,
+.side-add,
+.tb-btn,
+.wc-btn,
+.web-btn,
+.ex-row {
+  transition: background-color 0.1s ease, color 0.1s ease;
+  /* squircle the hover/active/selected highlight to match the app's chrome */
+  corner-shape: squircle;
+}
+
+@keyframes sp-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes sp-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.975);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* exit counterpart for pop-style surfaces (confirm modals). Mirrors sp-pop so
+   the surface grows in and shrinks out along the same path (§spatial
+   consistency) — scale down a touch + fade, ease-in so it commits to leaving. */
+@keyframes sp-pop-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+::-webkit-scrollbar-button,
+::-webkit-scrollbar-corner {
+  display: none;
+  width: 0;
+  height: 0;
+}

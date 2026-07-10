@@ -22,12 +22,14 @@ type ptyProc struct {
 func (p *ptyProc) Read(buf []byte) (int, error)  { return p.out.Read(buf) }
 func (p *ptyProc) Write(b []byte) (int, error) { return p.in.Write(b) }
 
-func openConPTY(cwd string, cols, rows uint16) (*ptyProc, error) {
+func openConPTY(cwd string, cols, rows uint16, program string, args []string) (*ptyProc, error) {
 	shell := "bash"
-	if p, err := exec.LookPath("zsh"); err == nil {
+	if program != "" {
+		shell = program
+	} else if p, err := exec.LookPath("zsh"); err == nil {
 		shell = p
 	}
-	cmd := exec.Command(shell)
+	cmd := exec.Command(shell, args...)
 	cmd.Dir = cwd
 	cmd.SysProcAttr = &syscall.SysProcAttr{}
 

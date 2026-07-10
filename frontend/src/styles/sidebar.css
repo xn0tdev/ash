@@ -1,0 +1,661 @@
+/* ── Sidebar ───────────────────────────────────────────── */
+
+.sidebar {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 2px 8px 10px;
+}
+
+/* Render icon curves at full geometric precision — insurance against any
+   crisp-edges fallback that would jag the dense stroke icons. */
+.sidebar svg {
+  shape-rendering: geometricPrecision;
+}
+
+/* pinned top: New agent / Search / New terminal / Pinned — stays put */
+.side-top {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.side-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  /* a little room under the last row before it meets the footer fade */
+  padding-bottom: 12px;
+  /* no visible scrollbar in the sidebar — it still scrolls on wheel/trackpad,
+     and the footer fade already hints there's more below */
+  scrollbar-width: none;
+}
+
+/* sidebar scrolls with no visible scrollbar */
+.side-scroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.side-action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12.5px;
+  cursor: default;
+  flex-shrink: 0;
+}
+
+.side-action .tab-icon {
+  color: var(--text);
+}
+
+/* action-row icons render larger — 14px squeezes the 24-grid set into mush */
+.side-action .tab-icon svg {
+  width: 17px;
+  height: 17px;
+}
+.side-action .tab-icon svg.settings-ico {
+  width: 17px;
+  height: 17px;
+}
+
+.side-action:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+
+.side-footer {
+  position: relative;
+  flex-shrink: 0;
+  padding-top: 6px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Soft alpha fade pinned right above the Settings footer, so the list always
+   melts into it at the very bottom — no matter how many rows there are. Anchored
+   to the footer (not the scroll box) so it can't float up into mid-list when the
+   content is short. Over empty space it's invisible (bg over bg); over the last
+   rows it dissolves them into the footer. */
+.side-footer::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: 26px;
+  pointer-events: none;
+  background: linear-gradient(to top, var(--bg), transparent);
+}
+
+/* Category header (Workspaces / Commands / …) — pinned to the top of the
+   scroll area so only the chats/rows below it scroll. Solid opaque bg so
+   scrolling rows never bleed through; the 20px top gap is padding (not margin)
+   so it stays part of the header box when stuck instead of a see-through
+   strip. Kept compact — a bottom fade here just reads as an ugly gap. */
+.side-header {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 2px 5px 8px;
+  font-size: 11.5px;
+  color: var(--faint);
+  flex-shrink: 0;
+}
+
+/* Soft melt right under the pinned header — rows sliding up dissolve into it
+   instead of hard-cutting. The top counterpart to the footer fade. An absolute
+   overlay (top: 100%) so it adds NO empty space — a padded version read as an
+   ugly gap. */
+.side-header::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 14px;
+  pointer-events: none;
+  background: linear-gradient(to bottom, var(--bg), transparent);
+}
+
+.side-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 7px;
+  corner-shape: squircle;
+  background: transparent;
+  color: var(--faint);
+  cursor: default;
+}
+
+.side-add:hover {
+  color: var(--text);
+}
+
+.side-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.side-add.on {
+  color: var(--text);
+}
+
+.side-filter {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 4px 6px;
+  padding: 0 8px 0 9px;
+  height: 30px;
+  border-radius: 10px;
+  corner-shape: squircle;
+  background: var(--hover);
+  color: var(--faint);
+  flex-shrink: 0;
+}
+
+.side-filter > svg {
+  flex-shrink: 0;
+}
+
+.side-filter input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 12.5px;
+  font-family: inherit;
+  outline: none;
+}
+
+.side-filter input::placeholder {
+  color: var(--faint);
+}
+
+.side-filter-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--faint);
+  cursor: default;
+  flex-shrink: 0;
+}
+
+.side-filter-clear:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.ws-diff {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  animation: ws-fade-in 0.25s ease;
+}
+
+@keyframes ws-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.ws-diff .add {
+  color: #6cae86;
+}
+
+.ws-diff .del {
+  color: #c68585;
+}
+
+.side-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 29px;
+  padding: 0 8px;
+  border-radius: 10px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.side-row:hover {
+  background: var(--hover);
+}
+
+.ws-row:hover {
+  background: transparent;
+}
+
+/* a tab is being dragged over this workspace row */
+.ws-row.drop-target {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.side-row.active {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.tab-icon {
+  display: flex;
+  justify-content: center;
+  width: 16px;
+  color: var(--icon);
+  flex-shrink: 0;
+}
+
+/* 16px (fills the 16px column exactly → integer centering, no fractional
+   sub-pixel margin) instead of 14px, which crushed the dense 24-grid icons. */
+.tab-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.tab-icon svg.term-ico {
+  width: 18px;
+  height: 18px;
+}
+
+.tab-icon svg.settings-ico {
+  width: 15px;
+  height: 15px;
+}
+
+.ws-folder {
+  position: relative;
+  width: 16px;
+  height: 20px;
+}
+
+/* Both folder states stacked; cross-fade via alpha on open/close. Centered
+   with integer offsets (18px in a 16×20 box) rather than translate(-50%,-50%):
+   the percentage translate lands the icon on half-pixels and forces a blurry
+   separate raster layer — plain top/left keeps it pixel-snapped and crisp. */
+.ws-folder svg {
+  position: absolute;
+  top: 1px;
+  left: -1px;
+  width: 18px;
+  height: 18px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.ws-folder.is-closed svg:first-child,
+.ws-folder.is-open svg:last-child {
+  opacity: 1;
+  z-index: 1;
+}
+
+.ws-tabs {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 0.2s ease;
+}
+
+.ws-tabs.closed {
+  grid-template-rows: 0fr;
+}
+
+.ws-tabs-inner {
+  min-height: 0;
+  overflow: hidden;
+  opacity: 1;
+  transition: opacity 0.18s ease;
+}
+
+.ws-tabs.closed .ws-tabs-inner {
+  opacity: 0;
+}
+
+.ws-count {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--faint);
+  /* proportional Inter figures — tabular-nums made the count look mono/techy */
+  font-variant-numeric: proportional-nums;
+}
+
+.side-row:hover .ws-count {
+  display: none;
+}
+
+.side-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  font-weight: 400;
+}
+
+.ws-branch {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--faint);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.row-actions {
+  display: none;
+  align-items: center;
+  gap: 1px;
+  flex-shrink: 0;
+}
+
+.side-row:hover .row-actions {
+  display: flex;
+}
+
+.side-row:hover .ws-branch {
+  display: none;
+}
+
+.row-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 7px;
+  corner-shape: squircle;
+  background: transparent;
+  color: var(--muted);
+  cursor: default;
+}
+
+.row-btn:hover {
+  color: var(--text);
+}
+
+.ws-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex-shrink: 0;
+}
+
+/* a new chat/terminal row easing into the list — a quiet fade only, no
+   scale (scaling a thin row read as a jitter, not a settle). Fires only when
+   a row actually mounts (React keeps existing rows by id), so it plays for a
+   genuinely new chat, not on every re-render. */
+@keyframes tab-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* tabs (threads) */
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 10px;
+  color: var(--muted);
+  flex-shrink: 0;
+  /* minimal: fade in over a short ease — no movement, no bounce */
+  animation: tab-in 0.18s ease;
+}
+
+.tab:hover {
+  background: var(--hover);
+}
+
+.tab.active {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.tab.active:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.tab.nested {
+  margin-left: 16px;
+}
+
+/* session row under an agent chat that is itself nested in a workspace */
+.tab.nested.session-sub {
+  margin-left: 32px;
+}
+
+.tab-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.tab-rename {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12.5px;
+  padding: 2px 5px;
+  outline: none;
+  user-select: text;
+}
+
+.tab-close {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 19px;
+  height: 19px;
+  margin-right: -2px;
+  border: none;
+  border-radius: 7px;
+  corner-shape: squircle;
+  background: transparent;
+  color: var(--muted);
+  cursor: default;
+  flex-shrink: 0;
+}
+
+.tab:hover .tab-close {
+  display: flex;
+}
+
+.tab-close:hover {
+  color: var(--text);
+}
+
+.tab-new {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 30px;
+  border: none;
+  border-radius: 9px;
+  corner-shape: squircle;
+  background: transparent;
+  color: var(--faint);
+  font-family: inherit;
+  font-size: 12.5px;
+  cursor: default;
+  flex-shrink: 0;
+}
+
+.tab-new:hover {
+  background: var(--hover);
+  color: var(--muted);
+}
+
+/* collapsed rail */
+/* quick / ssh rows */
+.side-row.util .side-name {
+  font-weight: 400;
+}
+
+/* pinned — same grow/shrink-to-content trick as .ws-tabs, so the section
+   (and the drop zone revealed while dragging a tab) grows in smoothly
+   instead of popping into existence. */
+.pinned-wrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  flex-shrink: 0;
+  transition: grid-template-rows 0.2s ease;
+}
+
+.pinned-wrap.open {
+  grid-template-rows: 1fr;
+}
+
+.pinned-wrap-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.pin-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.pin-zone.droppable {
+  /* compact reveal — 64px shoved everything below way down while dragging */
+  min-height: 16px;
+  transition: min-height 0.2s ease;
+}
+
+/* floating ghost while dragging a tab to pin (pointer-based drag) */
+.tab-drag-ghost {
+  position: fixed;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 220px;
+  padding: 6px 11px;
+  border-radius: 8px;
+  background: var(--raise);
+  color: var(--text);
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  pointer-events: none;
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.tab-drag-ghost .tab-icon {
+  color: var(--icon);
+  flex-shrink: 0;
+}
+
+.tab-drag-ghost > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* agent tab icon: center dots pulse gently while the agent works */
+.chat-dot {
+  animation: chatDotPulse 1.4s ease-in-out infinite;
+}
+.chat-dot.d2 {
+  animation-delay: 0.22s;
+}
+.chat-dot.d3 {
+  animation-delay: 0.44s;
+}
+@keyframes chatDotPulse {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+.spin-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 30px;
+}
+
+.spin-ring {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  border-top-color: var(--muted);
+  animation: spin-rot 0.7s linear infinite;
+}
+
+@keyframes spin-rot {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.yolo-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+}
+
+.yolo-hint {
+  font-size: 10.5px;
+  color: var(--faint);
+}
+
+.quick-icon {
+  color: var(--icon);
+}

@@ -21,13 +21,19 @@ type ptyProc struct {
 func (p *ptyProc) Read(buf []byte) (int, error)  { return p.proc.Read(buf) }
 func (p *ptyProc) Write(b []byte) (int, error) { return p.proc.Write(b) }
 
-func openConPTY(cwd string, cols, rows uint16) (*ptyProc, error) {
-	shell := findShell()
-	// conpty.Start takes a single command-line string + functional options
-	// for dimensions / working dir. We quote the shell path so paths with
-	// spaces parse. Read/Write hang off the returned ConPty directly — no
-	// separate pipe handles to juggle.
-	cmdLine := "\"" + shell[0] + "\""
+func openConPTY(cwd string, cols, rows uint16, program string, args []string) (*ptyProc, error) {
+	// Caller-supplied program wins (agent may spawn a specific shell); else
+	// auto-detect pwsh/powershell/cmd (matches Ash's Windows-shell assumption).
+	var cmdLine string
+	if program != "" {
+		cmdLine = "\"" + program + "\""
+		for _, a := range args {
+			cmdLine += " \"" + a + "\""
+		}
+	} else {
+		shell := findShell()
+		cmdLine = "\"" + shell[0] + "\""
+	}
 	c, err := conpty.Start(
 		cmdLine,
 		conpty.ConPtyDimensions(int(cols), int(rows)),

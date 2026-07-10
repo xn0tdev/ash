@@ -1,12 +1,19 @@
-import { memo } from "react";
+import { memo, lazy, Suspense } from "react";
 
 import TerminalPane from "./TerminalPane";
+import BrowserPane from "./BrowserPane";
 import { PaneNode } from "../lib/layout";
 
-// Wails port of Ash's PaneLayout. Renders the recursive split tree; for now
-// only the terminal pane kind is implemented (browser/file/agent arrive in
-// later phases — a leaf of those kinds shows a placeholder so splits don't
-// crash). Memoized at every level so an unchanged subtree bails out.
+// Lazily loaded so their heavy, on-demand-only dependencies don't parse at
+// startup: FileViewer pulls in CodeMirror + 13 language packs, AgentThread
+// pulls react-markdown. A fresh terminal / Welcome launch never touches them.
+const FileViewer = lazy(() => import("./FileViewer"));
+const AgentThread = lazy(() => import("./AgentThread"));
+
+// All callbacks take tabId as their first argument so App can pass the SAME
+// stable (useCallback) functions to every tab — that's what lets memo() below
+// actually skip re-rendering the pane trees of untouched (and hidden) tabs on
+// every App state change.
 interface PaneLayoutProps {
   node: PaneNode;
   tabId: string;
@@ -15,14 +22,64 @@ interface PaneLayoutProps {
   multi: boolean;
   onFocus: (tabId: string, paneId: string) => void;
   onRatio: (tabId: string, splitId: string, ratio: number) => void;
+  onUrlChange: (tabId: string, paneId: string, url: string) => void;
+  onClosePane: (paneId: string) => void;
+  /** An agent pane names its tab after the first prompt. */
+  onRename: (tabId: string, title: string) => void;
 }
 
 function PaneLayout(props: PaneLayoutProps) {
-  const { node, tabId, tabActive, activePane, multi, onFocus, onRatio } = props;
+  const {
+    node,
+    tabId,
+    tabActive,
+    activePane,
+    multi,
+    onFocus,
+    onRatio,
+    onUrlChange,
+    onClosePane,
+    onRename,
+  } = props;
 
   if (node.type === "leaf") {
-    if (node.kind === "term") {
-      return (
+    let content;
+    if (node.kind === "web") {
+      content = (
+        <BrowserPane
+          id={node.id}
+          url={node.url}
+          dimmed={multi && activePane !== node.id}
+          onFocus={() => onFocus(tabId, node.id)}
+          onUrlChange={(url) => onUrlChange(tabId, node.id, url)}
+          onClose={() => onClosePane(node.id)}
+        />
+      );
+    } else if (node.kind === "file") {
+      content = (
+        <FileViewer
+          id={node.id}
+          path={node.path}
+          dimmed={multi && activePane !== node.id}
+          onFocus={() => onFocus(tabId, node.id)}
+          onClose={() => onClosePane(node.id)}
+        />
+      );
+    } else if (node.kind === "agent") {
+      content = (
+        <AgentThread
+          id={node.id}
+          agentId={node.agentId}
+          cwd={node.cwd}
+          name={node.name}
+          dimmed={multi && activePane !== node.id}
+          onFocus={() => onFocus(tabId, node.id)}
+          onClose={() => onClosePane(node.id)}
+          onRename={(title) => onRename(tabId, title)}
+        />
+      );
+    } else {
+      content = (
         <TerminalPane
           id={node.id}
           focused={tabActive && activePane === node.id}
@@ -31,16 +88,13 @@ function PaneLayout(props: PaneLayoutProps) {
         />
       );
     }
-    // Placeholder for not-yet-ported pane kinds (web/file/agent) — keeps the
-    // split tree valid while those components are migrated.
+    // Suspense covers the lazily-loaded panes (file/changes/agent); it's a no-op
+    // for the eager terminal/web panes. Fallback fills the pane with the app bg
+    // so there's no white flash during the (fast, local) chunk load.
     return (
-      <div
-        className={`pane placeholder-pane${multi && activePane !== node.id ? " dim" : ""}`}
-        data-pane-id={node.id}
-        onMouseDownCapture={() => onFocus(tabId, node.id)}
-      >
-        <span>{node.kind} pane — not ported yet</span>
-      </div>
+      <Suspense fallback={<div style={{ flex: 1, background: "var(--bg)" }} />}>
+        {content}
+      </Suspense>
     );
   }
 
@@ -50,6 +104,7 @@ function PaneLayout(props: PaneLayoutProps) {
     e.preventDefault();
     const container = e.currentTarget.parentElement!;
     const rect = container.getBoundingClientRect();
+    // rAF-throttled — raw mousemove would setTabs (full tree state) 100+/s
     let raf = 0;
     let lastPos = ratio;
     const apply = () => {
@@ -74,6 +129,7 @@ function PaneLayout(props: PaneLayoutProps) {
     window.addEventListener("mousemove", move);
     window.addEventListener("mouseup", stop);
     document.body.style.cursor = dir === "row" ? "col-resize" : "row-resize";
+    // iframes swallow mousemove — block their pointer events while dragging.
     document.body.classList.add("dragging");
   };
 
@@ -90,5 +146,8 @@ function PaneLayout(props: PaneLayoutProps) {
   );
 }
 
+// Memoized at every level: an unchanged subtree (same node identity + same
+// stable callbacks) bails out entirely, so hidden tabs and untouched split
+// halves stop re-rendering on every App state change.
 const MemoPaneLayout = memo(PaneLayout);
 export default MemoPaneLayout;

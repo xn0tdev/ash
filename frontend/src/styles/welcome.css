@@ -1,0 +1,219 @@
+/* ── Welcome (no tabs open) ────────────────────────────── */
+
+.welcome {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+  border-radius: 10px;
+}
+
+.welcome-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: 100%;
+  max-width: 280px;
+  padding: 0 16px;
+}
+
+.welcome-actions,
+.welcome-recent {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.welcome-head {
+  padding: 0 2px 6px 10px;
+  font-size: 11.5px;
+  color: var(--faint);
+}
+
+.welcome-action {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 34px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 10px;
+  corner-shape: squircle;
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: default;
+  transition: background-color 0.1s ease, color 0.1s ease;
+}
+
+.welcome-action:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.welcome-action .tab-icon {
+  color: var(--icon);
+}
+
+.welcome-action > span:not(.tab-icon) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.welcome-shortcut {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--faint);
+}
+
+.split {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.split.row {
+  flex-direction: row;
+}
+
+.split.col {
+  flex-direction: column;
+}
+
+.split-child {
+  display: flex;
+  flex-shrink: 1;
+  flex-basis: 0;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* invisible drag zone with a grip shown on hover */
+.divider {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 6px;
+}
+
+.split.row > .divider {
+  cursor: col-resize;
+}
+
+.split.col > .divider {
+  cursor: row-resize;
+}
+
+.divider::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 3px;
+  background: transparent;
+  transition: background 0.12s ease;
+}
+
+.split.row > .divider::after {
+  width: 3px;
+  height: 36px;
+}
+
+.split.col > .divider::after {
+  width: 36px;
+  height: 3px;
+}
+
+/* grip only on hover — no persistent marks cluttering the layout */
+.divider:hover::after {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+/* inside a split every pane gets a uniform, moderate rounding — the
+   asymmetric window-edge radius (big top / small bottom) only makes sense on
+   a single full-bleed pane; mid-screen it reads as a mistake */
+.split .pane {
+  border-radius: 14px;
+}
+
+.pane {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  padding: 12px 8px 12px 14px;
+  background: var(--surface);
+  /* big rounding on the top corners (facing the app chrome); small on the
+     bottom ones, which sit flush against the window edge — a 20px curve there
+     leaves an ugly bg wedge at the OS window corner */
+  border-radius: 20px 20px 10px 10px;
+  corner-shape: squircle;
+  /* hairline ring instead of a real border — no layout shift */
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.055);
+  transition: opacity 0.15s ease;
+}
+
+/* terminal panes: no hairline ring — the xterm viewport fills the whole
+   surface, so a border just outlines dead padding */
+.pane.term-pane {
+  box-shadow: none;
+}
+
+/* warm breathing glow around a terminal the agent is actively driving —
+   overlay on top of everything in the pane, clicks pass through */
+/* Agent-driving overlay: the terminal grays out for the whole time the
+   agent owns it, with one icon + one line. Blocks clicks/scroll — the agent
+   controls the terminal, including scrolling. */
+.agent-glow {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  border-radius: 20px 20px 10px 10px;
+  corner-shape: squircle;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  cursor: default;
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  animation: sp-fade 0.4s ease;
+}
+.agent-takeover {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+}
+.agent-takeover svg {
+  color: var(--icon);
+}
+.agent-takeover span {
+  font-size: 13px;
+}
+
+.pane.dim {
+  opacity: 0.55;
+}
+
+.term-host,
+.term-container {
+  width: 100%;
+  height: 100%;
+}
+
+.term-container .xterm {
+  height: 100%;
+}
+
+body.dragging iframe {
+  pointer-events: none;
+}

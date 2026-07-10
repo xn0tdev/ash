@@ -1,0 +1,157 @@
+/* ── Explorer ──────────────────────────────────────────── */
+
+.explorer {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  transition: width 0.16s ease;
+}
+
+/* don't animate width while dragging the resize edge */
+body.dragging .explorer {
+  transition: none;
+}
+
+
+.ex-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 30px;
+  padding: 0 8px 0 14px;
+  flex-shrink: 0;
+}
+
+.ex-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ex-actions {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  flex-shrink: 0;
+}
+
+.ex-tree {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0 6px 8px;
+}
+
+.ex-tree::-webkit-scrollbar {
+  width: 3px;
+}
+
+.ex-tree::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
+.ex-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding-right: 6px;
+  border-radius: 8px;
+  corner-shape: squircle;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.ex-row:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.ex-chevron {
+  display: flex;
+  width: 10px;
+  flex-shrink: 0;
+  color: var(--faint);
+}
+
+.ex-icon {
+  display: flex;
+  flex-shrink: 0;
+  color: var(--faint);
+}
+
+.ex-icon.dir {
+  color: var(--icon);
+}
+
+.ex-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* git highlights — only touched files get color */
+.ex-row.git-M .ex-name {
+  color: #d8b06a;
+}
+
+.ex-row.git-U .ex-name,
+.ex-row.git-A .ex-name {
+  color: #6fc493;
+}
+
+.ex-badge {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 500;
+  padding-left: 4px;
+}
+
+.ex-row.git-M .ex-badge {
+  color: #d8b06a;
+}
+
+.ex-row.git-U .ex-badge,
+.ex-row.git-A .ex-badge {
+  color: #6fc493;
+}
+
+.ex-dot {
+  flex-shrink: 0;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--faint);
+  margin-left: 4px;
+}
+
+.ex-empty {
+  padding: 12px 14px;
+  font-size: 11.5px;
+  color: var(--faint);
+  line-height: 1.5;
+}
+
+.ex-input {
+  flex: 1;
+  min-width: 0;
+  height: 18px;
+  padding: 0 4px;
+  border: none;
+  border-radius: 8px;
+  corner-shape: squircle;
+  background: var(--raise);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+  outline: none;
+  user-select: text;
+}

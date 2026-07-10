@@ -1,147 +1,1639 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import TitleBar from "./TitleBar";
+import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { homeDir } from "@tauri-apps/api/path";
+
+import TitleBar from "./components/TitleBar";
 import Sidebar from "./components/Sidebar";
+import Welcome from "./components/Welcome";
 import PaneLayout from "./components/PaneLayout";
-import { disposeSession } from "./lib/term";
-import { leaves, removeLeaf, splitLeaf, termLeaf } from "./lib/layout";
-import { makeTab, Tab } from "./tabs";
-import "./sidebar.css";
-import "./layout.css";
-import "./App.css";
+import CommandPalette from "./components/CommandPalette";
+import Explorer from "./components/Explorer";
+import SettingsModal from "./components/SettingsModal";
+import UtilityModal from "./components/UtilityModal";
+import SshModal from "./components/SshModal";
+import RunModal from "./components/RunModal";
+import { AGENTS, AgentDef } from "./lib/agents";
+import { RunConfig, loadRuns, runCwd, saveRuns } from "./lib/runs";
+import { initPtyEvents, ptyKill } from "./lib/pty";
+import {
+  isBackgroundTerm,
+  removeBackgroundTerm,
+} from "./lib/background-terms";
+import { getBgAgent, onBgAgentsChange } from "./lib/bg-agents";
+import { listChats, removeChat, clearAllChats } from "./lib/chat-store";
+import { discardSandbox } from "./lib/sandbox";
+import { importSession } from "./lib/agent-engine/import";
+import type { ImportedSessionMeta } from "./lib/agent-engine/import/types";
+import { openUrl } from "@tauri-apps/plugin-opener";
+import {
+  adjustFontSize,
+  configureSessions,
+  disposeSession,
+  disposeAllSessions,
+  isLocalUrl,
+  isSessionUsed,
+  setSpawnOptions,
+} from "./lib/term";
+import { getSettings, onSettingsChange, updateSettings } from "./lib/settings";
+import {
+  Leaf,
+  PaneNode,
+  SplitDir,
+  firstLeaf,
+  leafIds,
+  leaves,
+  removeLeaf,
+  setLeafUrl,
+  setSplitRatio,
+  splitLeaf,
+  termLeaf,
+  webLeaf,
+  fileLeaf,
+  agentLeaf,
+} from "./lib/layout";
+import {
+  loadJson,
+  saveJson,
+  loadWorkspaces,
+  saveWorkspaces,
+  loadUtilities,
+  saveUtilities,
+  loadSshCustom,
+  SSH_KEY,
+  PINNED_KEY,
+} from "./lib/persistence";
+import type { WorkspaceState } from "./lib/persistence";
+import { makeTab, paneRect, basename, prettyTitle } from "./lib/tab-utils";
 
-// Phase-1 shell: frameless titlebar + sidebar + multi-tab + recursive split
-// tree of terminal panes. This is the first app-shaped milestone of the
-// Wails port — enough to feel the layout/split/sidebar UX on Go. Agent /
-// explorer / settings / browser panes arrive in later phases (placeholders
-// inside PaneLayout for now).
+initPtyEvents();
+
+export interface Tab {
+  id: string;
+  title: string;
+  titlePinned: boolean;
+  root: PaneNode;
+  activePane: string;
+  workspaceId: string | null;
+}
+
+export interface Workspace {
+  id: string;
+  path: string;
+  name: string;
+}
+
+export interface Utility {
+  id: string;
+  name: string;
+  command: string;
+  cwd?: string;
+}
+
+export interface SshHost {
+  id: string;
+  name: string;
+  args: string[];
+  password?: string;
+  builtin: boolean;
+}
+
+export interface PinnedItem {
+  type: "workspace" | "command" | "ssh" | "tab";
+  id: string;
+}
+
+const DEFAULT_WEB_URL = "http://localhost:3000";
+
 export default function App() {
-  const [tabs, setTabs] = useState<Tab[]>(() => [makeTab()]);
-  const [activeTabId, setActiveTabId] = useState<string>(() => tabs[0].id);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // Saved agent chats survive restarts — recreate their tabs on startup
+  // (the chat id doubles as the pane leaf id, so AgentThread finds its
+  // transcript again). Everything else starts fresh at the Welcome screen.
+  const initialTabs = useRef<Tab[] | null>(null);
+  if (!initialTabs.current) {
+    const ws = loadWorkspaces();
+    initialTabs.current = listChats().map((c) => ({
+      id: crypto.randomUUID(),
+      title: c.title,
+      titlePinned: true,
+      root: agentLeaf(c.chatId, c.agentId, c.cwd, c.name),
+      activePane: c.chatId,
+      workspaceId: ws.list.find((w) => w.path === c.cwd)?.id ?? null,
+    }));
+  }
+
+  const [tabs, setTabs] = useState<Tab[]>(initialTabs.current);
+  const [activeTabId, setActiveTabId] = useState<string | null>(
+    initialTabs.current[0]?.id ?? null,
+  );
+  const [confirmClose, setConfirmClose] = useState<{
+    tabId: string;
+    title: string;
+    /** Set when closing ONE agent pane inside a split — only that pane (and its
+     * chat) is removed on confirm. Absent = close the whole tab. */
+    paneId?: string;
+  } | null>(null);
+  const [confirmCloseAll, setConfirmCloseAll] = useState(false);
+  // Mount-through-close for the two confirm dialogs: flipping the state to
+  // null unmounts instantly, so we set a `closing` flag, let the exit
+  // animation play, then drop the dialog after it finishes. Separate flags so
+  // each dialog can animate out independently.
+  const [confirmClosing, setConfirmClosing] = useState(false);
+  const [confirmAllClosing, setConfirmAllClosing] = useState(false);
+  const confirmModalRef = useRef<HTMLDivElement>(null);
+  const confirmAllModalRef = useRef<HTMLDivElement>(null);
+  // Exit animation runs via the Web Animations API on the live modal element —
+  // swapping a CSS class to change animation-name on an element that already
+  // played its entrance reliably *does not* restart the animation in
+  // WebView2/Chromium, so the dialog just vanished with no exit. WAAPI plays
+  // a fresh keyframe effect on the same node every time.
+  const animateOut = (el: HTMLElement | null, done: () => void) => {
+    if (!el) {
+      done();
+      return;
+    }
+    const anim = el.animate(
+      [
+        { opacity: 1, transform: "scale(1)" },
+        { opacity: 0, transform: "scale(0.88)" },
+      ],
+      { duration: 220, easing: "cubic-bezier(0.4, 0, 1, 1)", fill: "forwards" },
+    );
+    anim.onfinish = () => done();
+  };
+  const closeConfirm = useCallback(() => {
+    setConfirmClosing(true);
+    animateOut(confirmModalRef.current, () => {
+      setConfirmClose(null);
+      setConfirmClosing(false);
+    });
+  }, []);
+  const closeConfirmAll = useCallback(() => {
+    setConfirmAllClosing(true);
+    animateOut(confirmAllModalRef.current, () => {
+      setConfirmCloseAll(false);
+      setConfirmAllClosing(false);
+    });
+  }, []);
+  const [collapsed, setCollapsedRaw] = useState(false);
+  // Wrap the toggle so the ~220ms sidebar open/close animation marks the body
+  // as "resizing" — that lets terminal panes skip their per-frame fit() (which
+  // recomputes the xterm grid + repaints the renderer and tanks FPS) and do a
+  // single trailing fit at the end instead. Separate from "dragging" because
+  // that one also kills the rail/content transitions (so the open wouldn't
+  // animate at all).
+  const sidebarAnim = useRef(0);
+  const setCollapsed = (next: boolean | ((c: boolean) => boolean)) => {
+    setCollapsedRaw(next);
+    document.body.classList.add("resizing");
+    window.clearTimeout(sidebarAnim.current);
+    sidebarAnim.current = window.setTimeout(
+      () => document.body.classList.remove("resizing"),
+      260,
+    );
+  };
+  const [workspaces, setWorkspaces] = useState<WorkspaceState>(loadWorkspaces);
+  const [utilities, setUtilities] = useState<Utility[]>(loadUtilities);
+  const [utilEditing, setUtilEditing] = useState<Utility | "new" | null>(null);
+  const [sshCustom, setSshCustom] = useState<SshHost[]>(loadSshCustom);
+  const [sshConfigHosts, setSshConfigHosts] = useState<string[]>([]);
+  const [sshAdding, setSshAdding] = useState(false);
+  const [detectedAgents, setDetectedAgents] = useState<string[]>([]);
+  const [runs, setRuns] = useState<RunConfig[]>([]);
+  const [runOpen, setRunOpen] = useState(false);
+  const [pinned, setPinned] = useState<PinnedItem[]>(() =>
+    // Tab ids don't survive a restart, so drop any stale pinned tabs.
+    loadJson<PinnedItem[]>(PINNED_KEY, []).filter((p) => p.type !== "tab"),
+  );
+  const [sections, setSections] = useState(() => getSettings().sections);
+  const [branch, setBranch] = useState<string | null>(null);
+  const [explorerOpen, setExplorerOpenRaw] = useState(false);
+  // Same `resizing`-class debounce as the sidebar toggle: the explorer animates
+  // its width over ~160ms, and without this the terminal host beside it reflows
+  // every frame → ResizeObserver → per-frame fit() (xterm grid + repaint) =
+  // jank. The mount/unmount effect below uses the raw setter directly.
+  const explorerAnim = useRef(0);
+  const setExplorerOpen = (next: boolean | ((o: boolean) => boolean)) => {
+    setExplorerOpenRaw(next);
+    document.body.classList.add("resizing");
+    window.clearTimeout(explorerAnim.current);
+    explorerAnim.current = window.setTimeout(
+      () => document.body.classList.remove("resizing"),
+      200,
+    );
+  };
+  const [exMounted, setExMounted] = useState(false);
+  const [exOpen, setExOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [explorerSide, setExplorerSide] = useState(
+    () => getSettings().explorerSide,
+  );
+  const [sidebarWidth, setSidebarWidth] = useState(
+    () => getSettings().sidebarWidth,
+  );
+  const [explorerWidth, setExplorerWidth] = useState(
+    () => getSettings().explorerWidth,
+  );
+
+  const activeWorkspace =
+    workspaces.list.find((w) => w.id === workspaces.activeId) ?? null;
+
   const tabsRef = useRef(tabs);
+  const activeTabIdRef = useRef(activeTabId);
+  const activeWorkspaceRef = useRef(activeWorkspace);
+  const workspacesRef = useRef(workspaces);
+  workspacesRef.current = workspaces;
+  const sidebarWidthRef = useRef(sidebarWidth);
+  const explorerWidthRef = useRef(explorerWidth);
   tabsRef.current = tabs;
+  activeTabIdRef.current = activeTabId;
+  activeWorkspaceRef.current = activeWorkspace;
+  sidebarWidthRef.current = sidebarWidth;
+  explorerWidthRef.current = explorerWidth;
 
-  const activeTab = tabs.find((t) => t.id === activeTabId) ?? tabs[0];
+  useEffect(
+    () =>
+      onSettingsChange((s) => {
+        setExplorerSide(s.explorerSide);
+        setSections(s.sections);
+      }),
+    [],
+  );
 
-  const setTab = useCallback((id: string, patch: Partial<Tab>) => {
-    setTabs((ts) => ts.map((t) => (t.id === id ? { ...t, ...patch } : t)));
+  // Keep the explorer mounted through its close animation (width → 0).
+  useEffect(() => {
+    if (explorerOpen) {
+      setExMounted(true);
+      const r = requestAnimationFrame(() =>
+        requestAnimationFrame(() => setExOpen(true)),
+      );
+      return () => cancelAnimationFrame(r);
+    }
+    setExOpen(false);
+    const t = setTimeout(() => setExMounted(false), 170);
+    return () => clearTimeout(t);
+  }, [explorerOpen]);
+
+  const beginEdgeResize = useCallback(
+    (target: "sidebar" | "explorer") => (e: React.MouseEvent) => {
+      e.preventDefault();
+      const startX = e.clientX;
+      const startW =
+        target === "sidebar"
+          ? sidebarWidthRef.current
+          : explorerWidthRef.current;
+      const sign =
+        target === "explorer" && getSettings().explorerSide === "right"
+          ? -1
+          : 1;
+      document.body.classList.add("dragging");
+      document.body.style.cursor = "col-resize";
+      // rAF-throttled: raw mousemove fires far above 60/s and each setState
+      // re-renders the whole App — coalesce to one update per frame.
+      let raf = 0;
+      let lastX = startX;
+      const clamped = () => {
+        const raw = startW + sign * (lastX - startX);
+        return target === "sidebar"
+          ? Math.min(400, Math.max(170, raw))
+          : Math.min(480, Math.max(170, raw));
+      };
+      const apply = () => {
+        raf = 0;
+        if (target === "sidebar") setSidebarWidth(clamped());
+        else setExplorerWidth(clamped());
+      };
+      const move = (ev: MouseEvent) => {
+        lastX = ev.clientX;
+        if (!raf) raf = requestAnimationFrame(apply);
+      };
+      const stop = () => {
+        window.removeEventListener("mousemove", move);
+        window.removeEventListener("mouseup", stop);
+        if (raf) cancelAnimationFrame(raf);
+        apply();
+        document.body.classList.remove("dragging");
+        document.body.style.cursor = "";
+        if (target === "sidebar") updateSettings({ sidebarWidth: clamped() });
+        else updateSettings({ explorerWidth: clamped() });
+      };
+      window.addEventListener("mousemove", move);
+      window.addEventListener("mouseup", stop);
+    },
+    [],
+  );
+
+  // Git branch of the active workspace, refreshed every few seconds.
+  useEffect(() => {
+    if (!activeWorkspace) {
+      setBranch(null);
+      return;
+    }
+    let alive = true;
+    const load = () =>
+      invoke<string | null>("git_branch", { path: activeWorkspace.path })
+        // identity guard: an unchanged branch string must not re-render App
+        .then((b) => alive && setBranch((prev) => (prev === b ? prev : b)))
+        .catch(() => alive && setBranch((prev) => (prev === null ? prev : null)));
+    load();
+    const timer = setInterval(load, 5000);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, [activeWorkspace?.path]);
+
+  const addWorkspace = useCallback(async () => {
+    const selected = await openDialog({
+      directory: true,
+      title: "Add workspace folder",
+    });
+    if (typeof selected !== "string") return;
+    setWorkspaces((prev) => {
+      const existing = prev.list.find((w) => w.path === selected);
+      const next = existing
+        ? { ...prev, activeId: existing.id }
+        : {
+            list: [
+              ...prev.list,
+              { id: crypto.randomUUID(), path: selected, name: basename(selected) },
+            ],
+            activeId: null as string | null,
+          };
+      if (!existing) next.activeId = next.list[next.list.length - 1].id;
+      saveWorkspaces(next);
+      return next;
+    });
   }, []);
 
-  const focusPane = useCallback((tabId: string, paneId: string) => {
-    setTab(tabId, { activePane: paneId });
-    setActiveTabId(tabId);
-  }, [setTab]);
+  const selectWorkspace = useCallback((id: string) => {
+    setWorkspaces((prev) => {
+      const next = { ...prev, activeId: id };
+      saveWorkspaces(next);
+      return next;
+    });
+  }, []);
 
-  const setRatio = useCallback((tabId: string, splitId: string, ratio: number) => {
+  const removeWorkspace = useCallback((id: string) => {
+    setWorkspaces((prev) => {
+      const list = prev.list.filter((w) => w.id !== id);
+      const next = {
+        list,
+        activeId:
+          prev.activeId === id ? (list[0]?.id ?? null) : prev.activeId,
+      };
+      saveWorkspaces(next);
+      return next;
+    });
+    // Its terminals keep running, just ungrouped.
+    setTabs((ts) =>
+      ts.map((t) => (t.workspaceId === id ? { ...t, workspaceId: null } : t)),
+    );
+  }, []);
+
+  const saveUtility = useCallback(
+    (data: { name: string; command: string; cwd?: string }, existing?: Utility) => {
+      setUtilities((prev) => {
+        const next = existing
+          ? prev.map((u) => (u.id === existing.id ? { ...u, ...data } : u))
+          : [...prev, { id: crypto.randomUUID(), ...data }];
+        saveUtilities(next);
+        return next;
+      });
+      setUtilEditing(null);
+    },
+    [],
+  );
+
+  const removeUtility = useCallback((id: string) => {
+    setUtilities((prev) => {
+      const next = prev.filter((u) => u.id !== id);
+      saveUtilities(next);
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    invoke<string[]>("ssh_hosts").then(setSshConfigHosts).catch(() => {});
+    invoke<string[]>("detect_bins", { names: AGENTS.map((a) => a.bin) })
+      .then(setDetectedAgents)
+      .catch(() => {});
+  }, []);
+
+  // The active workspace follows the selected terminal — only terminals are
+  // "selected"; clicking a folder just expands/collapses it. Depends on `tabs`
+  // too: dragging the ACTIVE tab into a workspace changes its workspaceId
+  // without changing activeTabId, and the title bar / explorer must follow.
+  useEffect(() => {
+    const wsId = tabs.find((t) => t.id === activeTabId)?.workspaceId;
+    if (!wsId) return;
+    setWorkspaces((prev) => {
+      if (prev.activeId === wsId) return prev;
+      const next = { ...prev, activeId: wsId };
+      saveWorkspaces(next);
+      return next;
+    });
+  }, [activeTabId, tabs]);
+
+  // Load per-project runs from .ash/run.json when the workspace changes.
+  useEffect(() => {
+    if (activeWorkspace) loadRuns(activeWorkspace.path).then(setRuns);
+    else setRuns([]);
+  }, [activeWorkspace?.path]);
+
+  // Clear-on-exit: when the OS window close is requested, wipe whatever the
+  // user chose (chats on disk, live terminals, or both) before destroying the
+  // window. Uses destroy() (not close()) so cleanup can't get stuck in a
+  // re-trigger loop, and races the async work against a hard timeout so the
+  // window ALWAYS exits even if a delete_path invoke hangs on a dying backend.
+  // Best-effort — a hard kill (taskkill / power loss) can't be intercepted.
+  useEffect(() => {
+    const win = getCurrentWindow();
+    let unlisten: (() => void) | undefined;
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      // destroy() tears the window down without re-firing onCloseRequested —
+      // close() would loop back into this handler and could stall.
+      win.destroy();
+    };
+    win
+      .onCloseRequested(async (e) => {
+        if (done) return;
+        const mode = getSettings().clearOnExit;
+        if (mode === "none") return; // let the default close proceed
+        e.preventDefault();
+        // Hard cap: no matter how long cleanup takes, exit after 800ms so the
+        // app never appears to "hang on close".
+        const guard = window.setTimeout(finish, 800);
+        try {
+          if (mode === "terminals" || mode === "all") disposeAllSessions();
+          if (mode === "chats" || mode === "all") await clearAllChats();
+        } catch {
+          // best-effort cleanup — never block the close on a failure
+        } finally {
+          window.clearTimeout(guard);
+          finish();
+        }
+      })
+      .then((u) => (unlisten = u));
+    return () => unlisten?.();
+  }, []);
+
+  const persistRuns = useCallback(
+    (next: RunConfig[]) => {
+      setRuns(next);
+      if (activeWorkspaceRef.current)
+        saveRuns(activeWorkspaceRef.current.path, next).catch(() => {});
+    },
+    [],
+  );
+
+  const execRun = useCallback(
+    (run: RunConfig) => {
+      const ws = activeWorkspaceRef.current;
+      if (run.type === "url") {
+        const tab = tabsRef.current.find((t) => t.id === activeTabIdRef.current);
+        if (tab) openWebPane(tab.id, tab.activePane, run.url ?? "");
+        setRunOpen(false);
+        return;
+      }
+      if (!ws) return;
+      const t = makeTab(run.name, true, ws.id);
+      setSpawnOptions(firstLeaf(t.root), {
+        cwd: runCwd(ws.path, run),
+        command: run.command,
+      });
+      setTabs((ts) => [...ts, t]);
+      setActiveTabId(t.id);
+      setRunOpen(false);
+    },
+    [],
+  );
+
+  const agents = AGENTS.filter((a) => detectedAgents.includes(a.bin));
+
+  const runAgent = useCallback((agent: AgentDef, command?: string): string => {
+    const ws = activeWorkspaceRef.current;
+    const tab = makeTab(agent.name, true, ws?.id ?? null);
+    setSpawnOptions(firstLeaf(tab.root), {
+      cwd: ws?.path ?? null,
+      command: command ?? agent.launch,
+    });
+    setTabs((t) => [...t, tab]);
+    setActiveTabId(tab.id);
+    return tab.id;
+  }, []);
+
+  // ── Pinned ────────────────────────────────────────────
+  const pinItem = useCallback((item: PinnedItem) => {
+    setPinned((prev) => {
+      if (prev.some((p) => p.type === item.type && p.id === item.id))
+        return prev;
+      const next = [...prev, item];
+      saveJson(PINNED_KEY, next);
+      return next;
+    });
+  }, []);
+
+  const unpinItem = useCallback((item: PinnedItem) => {
+    setPinned((prev) => {
+      const next = prev.filter(
+        (p) => !(p.type === item.type && p.id === item.id),
+      );
+      saveJson(PINNED_KEY, next);
+      return next;
+    });
+  }, []);
+
+  const movePinned = useCallback((from: number, to: number) => {
+    setPinned((prev) => {
+      if (from === to || from < 0 || to < 0) return prev;
+      const next = [...prev];
+      const [item] = next.splice(from, 1);
+      next.splice(Math.min(to, next.length), 0, item);
+      saveJson(PINNED_KEY, next);
+      return next;
+    });
+  }, []);
+
+  const sshHosts: SshHost[] = [
+    ...sshConfigHosts.map((h) => ({
+      id: `cfg:${h}`,
+      name: h,
+      args: ["-o", "StrictHostKeyChecking=accept-new", h],
+      builtin: true,
+    })),
+    ...sshCustom,
+  ];
+
+  const runSsh = useCallback((host: SshHost) => {
+    const tab = makeTab(host.name, true, null);
+    // ssh is spawned directly as the PTY process → clean remote terminal.
+    setSpawnOptions(firstLeaf(tab.root), {
+      program: "ssh",
+      args: host.args,
+      password: host.password,
+    });
+    setTabs((t) => [...t, tab]);
+    setActiveTabId(tab.id);
+  }, []);
+
+  const addSshHost = useCallback(
+    (data: {
+      name: string;
+      user: string;
+      host: string;
+      port: string;
+      password: string;
+    }) => {
+      const target = data.user ? `${data.user}@${data.host}` : data.host;
+      // accept-new skips the interactive fingerprint "yes/no" prompt.
+      const args = ["-o", "StrictHostKeyChecking=accept-new", target];
+      if (data.port) args.push("-p", data.port);
+      setSshCustom((prev) => {
+        const next = [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            name: data.name || data.host,
+            args,
+            password: data.password || undefined,
+            builtin: false,
+          },
+        ];
+        try {
+          localStorage.setItem(SSH_KEY, JSON.stringify(next));
+        } catch {
+          // best-effort persistence
+        }
+        return next;
+      });
+      setSshAdding(false);
+    },
+    [],
+  );
+
+  const removeSshHost = useCallback((id: string) => {
+    setSshCustom((prev) => {
+      const next = prev.filter((h) => h.id !== id);
+      try {
+        localStorage.setItem(SSH_KEY, JSON.stringify(next));
+      } catch {
+        // best-effort persistence
+      }
+      return next;
+    });
+  }, []);
+
+  const runUtility = useCallback((util: Utility) => {
+    const ws = activeWorkspaceRef.current;
+    const tab = makeTab(util.name, true, util.cwd ? null : (ws?.id ?? null));
+    setSpawnOptions(firstLeaf(tab.root), {
+      cwd: util.cwd || ws?.path || null,
+      command: util.command,
+    });
+    setTabs((t) => [...t, tab]);
+    setActiveTabId(tab.id);
+  }, []);
+
+  // "New tab" always opens outside any workspace — drag it onto a workspace
+  // in the sidebar to move it in, or use that workspace's own "+" instead.
+  const addTab = useCallback(() => {
+    const tab = makeTab("shell", false, null);
+    setSpawnOptions(firstLeaf(tab.root), {});
+    setTabs((t) => [...t, tab]);
+    setActiveTabId(tab.id);
+  }, []);
+
+  const moveTabToWorkspace = useCallback((tabId: string, wsId: string | null) => {
+    const tab = tabsRef.current.find((t) => t.id === tabId);
+    if (!tab || tab.workspaceId === wsId) return;
+    const ws = wsId ? workspacesRef.current.list.find((w) => w.id === wsId) : null;
+
+    const ls = leaves(tab.root);
+
+    // An agent chat moves WITH its history: the leaf is rebuilt pointing at the
+    // workspace folder, and AgentThread re-points its live session's cwd — so
+    // "wrote code, forgot to put the chat in the workspace" costs nothing.
+    if (ws && ls.length === 1 && ls[0].kind === "agent" && !ls[0].agentId.startsWith("bg:")) {
+      const leaf = ls[0];
+      setTabs((ts) =>
+        ts.map((t) =>
+          t.id === tabId
+            ? {
+                ...t,
+                root: agentLeaf(leaf.id, leaf.agentId, ws.path, ws.name),
+                workspaceId: wsId,
+                ...(t.title === "Agent" ? { title: `${ws.name} · Agent` } : {}),
+              }
+            : t,
+        ),
+      );
+      return;
+    }
+
+    // A pristine single terminal (nothing typed or run since it spawned) is
+    // respawned fresh IN the folder, so its shell actually starts there. A
+    // used one just moves as-is — same live terminal, only regrouped (it will
+    // start in the folder on the next app launch).
+    const pristine =
+      ws &&
+      ls.length === 1 &&
+      ls[0].kind === "term" &&
+      !isBackgroundTerm(ls[0].id) &&
+      !isSessionUsed(ls[0].id);
+    if (pristine) {
+      const oldId = ls[0].id;
+      ptyKill(oldId);
+      disposeSession(oldId);
+      const freshId = crypto.randomUUID();
+      setSpawnOptions(freshId, { cwd: ws.path });
+      setTabs((ts) =>
+        ts.map((t) =>
+          t.id === tabId
+            ? {
+                ...t,
+                root: termLeaf(freshId),
+                activePane: freshId,
+                workspaceId: wsId,
+                ...(t.titlePinned ? {} : { title: ws.name }),
+              }
+            : t,
+        ),
+      );
+      return;
+    }
+
     setTabs((ts) =>
       ts.map((t) =>
-        t.id === tabId ? { ...t, root: setSplitRatioLocal(t.root, splitId, ratio) } : t,
+        t.id === tabId && t.workspaceId !== wsId ? { ...t, workspaceId: wsId } : t,
       ),
     );
   }, []);
 
-  const newTab = useCallback(() => {
-    const t = makeTab();
-    setTabs((ts) => [...ts, t]);
-    setActiveTabId(t.id);
-  }, []);
-
-  const closeTab = useCallback((id: string) => {
-    setTabs((ts) => {
-      if (ts.length <= 1) return ts;
-      const idx = ts.findIndex((t) => t.id === id);
-      // Tear down every terminal session in the tab before dropping it.
-      leaves(ts[idx].root).forEach((l) => {
-        if (l.kind === "term") disposeSession(l.id);
-      });
-      const next = ts.filter((t) => t.id !== id);
-      if (id === activeTabId) setActiveTabId(next[Math.max(0, idx - 1)].id);
+  // Welcome screen's "Open folder" — adds the workspace and drops straight
+  // into a terminal there, instead of the two-step add-then-"+" flow.
+  const startInFolder = useCallback(async () => {
+    const selected = await openDialog({
+      directory: true,
+      title: "Open folder",
+    });
+    if (typeof selected !== "string") return;
+    const existing = workspacesRef.current.list.find((w) => w.path === selected);
+    const ws = existing ?? {
+      id: crypto.randomUUID(),
+      path: selected,
+      name: basename(selected),
+    };
+    setWorkspaces((prev) => {
+      const next = existing
+        ? { ...prev, activeId: ws.id }
+        : { list: [...prev.list, ws], activeId: ws.id };
+      saveWorkspaces(next);
       return next;
     });
-  }, [activeTabId]);
+    const tab = makeTab("shell", false, ws.id);
+    setSpawnOptions(firstLeaf(tab.root), { cwd: ws.path });
+    setTabs((t) => [...t, tab]);
+    setActiveTabId(tab.id);
+  }, []);
 
-  const splitActive = useCallback((dir: "row" | "col") => {
-    if (!activeTab) return;
-    const paneId = crypto.randomUUID();
+  // Open a file in a syntax-highlighted viewer tab (reuse if already open).
+  const openFile = useCallback((path: string) => {
+    const existing = tabsRef.current.find((t) => {
+      const ls = leaves(t.root);
+      return ls.length === 1 && ls[0].kind === "file" && ls[0].path === path;
+    });
+    if (existing) {
+      setActiveTabId(existing.id);
+      return;
+    }
+    const leafId = crypto.randomUUID();
+    const tab: Tab = {
+      id: crypto.randomUUID(),
+      title: basename(path),
+      titlePinned: true,
+      root: fileLeaf(leafId, path),
+      activePane: leafId,
+      workspaceId: activeWorkspaceRef.current?.id ?? null,
+    };
+    setTabs((t) => [...t, tab]);
+    setActiveTabId(tab.id);
+  }, []);
+
+  // Open an agent-thread tab (Codex-style: prompt an agent, watch it work).
+  // New agents start OUTSIDE any workspace in the user's HOME directory (not the
+  // app's launch dir) — drag the tab onto a workspace to move it there; the chat
+  // keeps its history and simply re-points its working directory (see
+  // moveTabToWorkspace).
+  const openAgent = useCallback(async (agentId = "claude") => {
+    const home = await homeDir().catch(() => "");
+    const leafId = crypto.randomUUID();
+    const tab: Tab = {
+      id: crypto.randomUUID(),
+      title: "Agent",
+      titlePinned: true,
+      root: agentLeaf(leafId, agentId, home, ""),
+      activePane: leafId,
+      workspaceId: null,
+    };
+    setTabs((t) => [...t, tab]);
+    setActiveTabId(tab.id);
+  }, []);
+
+  // Import a Claude Code / Pi session as a new Ash chat (with its history) and
+  // open it — importSession() has already persisted it via saveChat().
+  const openImportedChat = useCallback(async (meta: ImportedSessionMeta) => {
+    const r = await importSession(meta);
+    if (!r) return;
+    // Group the imported chat under a workspace matching its cwd, creating that
+    // workspace if none exists — otherwise it lands as a loose (folderless) tab.
+    let wsId: string | null = null;
+    if (r.cwd) {
+      const existing = workspacesRef.current.list.find((w) => w.path === r.cwd);
+      if (existing) wsId = existing.id;
+      else {
+        const id = crypto.randomUUID();
+        wsId = id;
+        setWorkspaces((prev) => {
+          if (prev.list.some((w) => w.path === r.cwd)) return prev;
+          const next = {
+            list: [...prev.list, { id, path: r.cwd, name: r.name || basename(r.cwd) }],
+            activeId: prev.activeId,
+          };
+          saveWorkspaces(next);
+          return next;
+        });
+      }
+    }
+    const tab: Tab = {
+      id: crypto.randomUUID(),
+      title: r.title,
+      titlePinned: true,
+      root: agentLeaf(r.chatId, "ash", r.cwd, r.name),
+      activePane: r.chatId,
+      workspaceId: wsId,
+    };
+    setTabs((t) => [...t, tab]);
+    setActiveTabId(tab.id);
+  }, []);
+
+  // View a background agent's chat: a read-only AgentThread bound to the
+  // bg-agents store (agentId "bg:<id>"). Stable pane id → reopening focuses.
+  const openBgAgentViewer = useCallback((bgId: string, agentName: string) => {
+    // The agent may have been removed (TTL/prune/stop) in the frame between the
+    // store update and the sidebar dropping its row, so a stale row is still
+    // clickable — don't open a viewer for an agent that no longer exists.
+    if (!getBgAgent(bgId)) return;
+    const paneId = `bgv:${bgId}`;
+    const existing = tabsRef.current.find((t) => leafIds(t.root).includes(paneId));
+    if (existing) {
+      setActiveTabId(existing.id);
+      return;
+    }
+    const tab: Tab = {
+      id: crypto.randomUUID(),
+      title: agentName,
+      titlePinned: true,
+      root: agentLeaf(paneId, `bg:${bgId}`, "", agentName),
+      activePane: paneId,
+      workspaceId: null,
+    };
+    setTabs((t) => [...t, tab]);
+    setActiveTabId(tab.id);
+  }, []);
+
+  // View a background session: reattach its live terminal into a normal tab
+  // (same pane id → ensureSession re-parents the existing xterm container).
+  const openBackgroundTerm = useCallback((id: string, title: string) => {
+    const existing = tabsRef.current.find((t) => leafIds(t.root).includes(id));
+    if (existing) {
+      setActiveTabId(existing.id);
+      return;
+    }
+    const tab: Tab = {
+      id: crypto.randomUUID(),
+      title,
+      titlePinned: true,
+      root: termLeaf(id),
+      activePane: id,
+      workspaceId: null,
+    };
+    setTabs((t) => [...t, tab]);
+    setActiveTabId(tab.id);
+  }, []);
+
+  const killBackgroundTerm = useCallback((id: string) => {
+    ptyKill(id);
+    disposeSession(id);
+    removeBackgroundTerm(id);
+    const tab = tabsRef.current.find((t) => leafIds(t.root).includes(id));
+    if (!tab) return;
+    // Remove ONLY this pane's leaf, not the whole tab — the bg-term viewer may
+    // be split with other terminals/agent chats, which must not be destroyed
+    // (they'd leak PTYs and drop chats without the confirm). Mirrors closePane.
+    const newRoot = removeLeaf(tab.root, id);
+    if (newRoot) {
+      setTabs((ts) =>
+        ts.map((t) =>
+          t.id === tab.id
+            ? {
+                ...t,
+                root: newRoot,
+                activePane: leafIds(newRoot).includes(t.activePane)
+                  ? t.activePane
+                  : firstLeaf(newRoot),
+              }
+            : t,
+        ),
+      );
+      return;
+    }
+    // Was the tab's last pane — close the tab (matching closePane's handling).
+    const remaining = tabsRef.current.filter((t) => t.id !== tab.id);
+    if (remaining.length === 0) {
+      getCurrentWindow().close();
+      return;
+    }
+    if (activeTabIdRef.current === tab.id) {
+      const idx = tabsRef.current.findIndex((t) => t.id === tab.id);
+      setActiveTabId(remaining[Math.min(idx, remaining.length - 1)].id);
+    }
+    setTabs(remaining);
+  }, []);
+
+  // Reap background-agent VIEWER panes whose agent has left the store (stopped,
+  // 60s TTL, or pruned). Otherwise the viewer tab lingers after its sidebar row
+  // is gone, frozen on a stale transcript that mislabels itself "stopped". Fires
+  // on every bg-agents change but only re-renders when a viewer is actually dead.
+  useEffect(
+    () =>
+      onBgAgentsChange(() => {
+        const ts = tabsRef.current;
+        let changed = false;
+        const next: Tab[] = [];
+        for (const t of ts) {
+          const dead = leaves(t.root).filter(
+            (l) =>
+              l.kind === "agent" &&
+              l.agentId.startsWith("bg:") &&
+              !getBgAgent(l.agentId.slice(3)),
+          );
+          if (!dead.length) {
+            next.push(t);
+            continue;
+          }
+          changed = true;
+          let root: PaneNode | null = t.root;
+          for (const l of dead) {
+            disposeSession(l.id);
+            root = root ? removeLeaf(root, l.id) : null;
+          }
+          if (root)
+            next.push({
+              ...t,
+              root,
+              activePane: leafIds(root).includes(t.activePane) ? t.activePane : firstLeaf(root),
+            });
+          // else: the tab held only dead viewer leaves → drop the whole tab
+        }
+        if (!changed) return;
+        if (!next.some((t) => t.id === activeTabIdRef.current))
+          setActiveTabId(next.length ? next[next.length - 1].id : null);
+        setTabs(next);
+      }),
+    [],
+  );
+
+  const addTabInWorkspace = useCallback(
+    (wsId: string) => {
+      const ws = workspaces.list.find((w) => w.id === wsId);
+      if (!ws) return;
+      const tab = makeTab("shell", false, ws.id);
+      setSpawnOptions(firstLeaf(tab.root), { cwd: ws.path });
+      setTabs((t) => [...t, tab]);
+      setActiveTabId(tab.id);
+      selectWorkspace(ws.id);
+    },
+    [workspaces.list, selectWorkspace],
+  );
+
+  const closePane = useCallback((paneId: string, kill: boolean) => {
+    // Closing an agent chat is guarded by a confirm modal (accidental close
+    // would bury a whole conversation).
+    if (kill) {
+      const holder = tabsRef.current.find((t) => leafIds(t.root).includes(paneId));
+      const leaf = holder ? leaves(holder.root).find((l) => l.id === paneId) : undefined;
+      // bg-agent viewers ("bg:*") close freely — nothing is lost with them
+      if (holder && leaf?.kind === "agent" && !leaf.agentId.startsWith("bg:")) {
+        // Carry paneId so the confirm only closes THIS pane, not every sibling
+        // in the split (which used to delete unrelated terminals + all chats).
+        setConfirmClose({ tabId: holder.id, title: holder.title, paneId });
+        return;
+      }
+    }
+    if (isBackgroundTerm(paneId)) {
+      if (kill) {
+        // User closed the viewing tab; the background session keeps running offscreen.
+      } else {
+        // The background process itself exited — retire the session.
+        removeBackgroundTerm(paneId);
+        disposeSession(paneId);
+      }
+    } else {
+      if (kill) ptyKill(paneId);
+      disposeSession(paneId);
+    }
+    const tab = tabsRef.current.find((t) => leafIds(t.root).includes(paneId));
+    if (!tab) return;
+    const newRoot = removeLeaf(tab.root, paneId);
+    if (newRoot) {
+      setTabs((ts) =>
+        ts.map((t) =>
+          t.id === tab.id
+            ? {
+                ...t,
+                root: newRoot,
+                activePane: leafIds(newRoot).includes(t.activePane)
+                  ? t.activePane
+                  : firstLeaf(newRoot),
+              }
+            : t,
+        ),
+      );
+      return;
+    }
+    // Last pane of the tab — close the tab itself.
+    const remaining = tabsRef.current.filter((t) => t.id !== tab.id);
+    if (remaining.length === 0) {
+      getCurrentWindow().close();
+      return;
+    }
+    if (activeTabIdRef.current === tab.id) {
+      const idx = tabsRef.current.findIndex((t) => t.id === tab.id);
+      setActiveTabId(remaining[Math.min(idx, remaining.length - 1)].id);
+    }
+    setTabs(remaining);
+  }, []);
+
+  // Stable "close with kill" for PaneLayout (memo needs one identity).
+  const closePaneKill = useCallback((paneId: string) => closePane(paneId, true), [closePane]);
+
+  // Sidebar close button: agent chats get a confirm modal first.
+  const requestCloseTab = useCallback((tabId: string) => {
+    const tab = tabsRef.current.find((t) => t.id === tabId);
+    if (!tab) return;
+    if (leaves(tab.root).some((l) => l.kind === "agent" && !l.agentId.startsWith("bg:")))
+      setConfirmClose({ tabId, title: tab.title });
+    else closeTab(tabId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const closeTab = useCallback((tabId: string) => {
+    const tab = tabsRef.current.find((t) => t.id === tabId);
+    if (!tab) return;
+    leafIds(tab.root).forEach((id) => {
+      if (isBackgroundTerm(id)) return; // background session keeps running
+      ptyKill(id);
+      disposeSession(id);
+    });
+    const remaining = tabsRef.current.filter((t) => t.id !== tabId);
+    if (remaining.length === 0) {
+      getCurrentWindow().close();
+      return;
+    }
+    if (activeTabIdRef.current === tabId) {
+      const idx = tabsRef.current.findIndex((t) => t.id === tabId);
+      setActiveTabId(remaining[Math.min(idx, remaining.length - 1)].id);
+    }
+    setTabs(remaining);
+  }, []);
+
+  // Close ALL terminals and agent chats (chats are deleted). Unlike closing the
+  // last tab by hand, this lands on the Welcome screen instead of quitting.
+  const closeAllTabs = useCallback(() => {
+    for (const tab of tabsRef.current) {
+      leaves(tab.root).forEach((l) => {
+        if (l.kind === "agent") {
+          removeChat(l.id);
+          discardSandbox(l.id);
+        }
+      });
+      leafIds(tab.root).forEach((pid) => {
+        if (isBackgroundTerm(pid)) return; // background session keeps running
+        ptyKill(pid);
+        disposeSession(pid);
+      });
+    }
+    setTabs([]);
+    setActiveTabId(null);
+  }, []);
+
+  const splitWith = useCallback(
+    (tabId: string, targetPane: string, dir: SplitDir, node: Leaf) => {
+      setTabs((ts) =>
+        ts.map((t) =>
+          t.id === tabId
+            ? {
+                ...t,
+                root: splitLeaf(t.root, targetPane, dir, node),
+                activePane: node.id,
+              }
+            : t,
+        ),
+      );
+    },
+    [],
+  );
+
+  const splitActive = useCallback(
+    (dir: SplitDir) => {
+      const tab = tabsRef.current.find((t) => t.id === activeTabIdRef.current);
+      if (!tab) return;
+      splitWith(tab.id, tab.activePane, dir, termLeaf(crypto.randomUUID()));
+    },
+    [splitWith],
+  );
+
+  const focusPane = useCallback((tabId: string, paneId: string) => {
     setTabs((ts) =>
       ts.map((t) =>
-        t.id === activeTab.id
-          ? { ...t, root: splitLeaf(t.root, t.activePane, dir, termLeaf(paneId)), activePane: paneId }
+        t.id === tabId && t.activePane !== paneId
+          ? { ...t, activePane: paneId }
           : t,
       ),
     );
-  }, [activeTab]);
+  }, []);
 
-  const closePane = useCallback((paneId: string) => {
-    if (!activeTab) return;
-    const ls = leaves(activeTab.root);
-    if (ls.length <= 1) return; // never empty a tab to zero panes
-    disposeSession(paneId);
-    const newRoot = removeLeaf(activeTab.root, paneId);
-    if (newRoot) {
-      setTab(activeTab.id, {
-        root: newRoot,
-        activePane: activeTab.activePane === paneId ? leaves(newRoot)[0].id : activeTab.activePane,
-      });
-    }
-  }, [activeTab, setTab]);
-
-  // Hotkeys: new tab, close tab, split right/down, cycle tabs. Matches Ash.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (!e.ctrlKey || !e.shiftKey) return;
-      if (e.key === "T") { e.preventDefault(); newTab(); }
-      else if (e.key === "W") { e.preventDefault(); if (activeTab) closeTab(activeTab.id); }
-      else if (e.key === "D") { e.preventDefault(); splitActive("row"); }
-      else if (e.key === "E") { e.preventDefault(); splitActive("col"); }
-      else if (e.key === "B") { e.preventDefault(); setSidebarCollapsed((c) => !c); }
-      else if (e.key === "Tab") {
-        e.preventDefault();
-        const ts = tabsRef.current;
-        if (ts.length < 2) return;
-        const idx = ts.findIndex((t) => t.id === activeTabId);
-        setActiveTabId(ts[(idx + 1) % ts.length].id);
+  /** Open a URL in the tab's browser pane, reusing an existing one. */
+  const openWebPane = useCallback(
+    (tabId: string, fromPane: string, url: string) => {
+      const tab = tabsRef.current.find((t) => t.id === tabId);
+      if (!tab) return;
+      const existing = leaves(tab.root).find((l) => l.kind === "web");
+      if (existing) {
+        setTabs((ts) =>
+          ts.map((t) =>
+            t.id === tabId
+              ? {
+                  ...t,
+                  root: setLeafUrl(t.root, existing.id, url),
+                  activePane: existing.id,
+                }
+              : t,
+          ),
+        );
+      } else {
+        splitWith(tabId, fromPane, "row", webLeaf(crypto.randomUUID(), url));
       }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [newTab, closeTab, splitActive, activeTabId, activeTab]);
+    },
+    [splitWith],
+  );
 
-  if (!activeTab) return null;
-  const panes = leaves(activeTab.root);
+  const navigatePane = useCallback(
+    (dx: number, dy: number) => {
+      const tab = tabsRef.current.find((t) => t.id === activeTabIdRef.current);
+      if (!tab) return;
+      const ids = leafIds(tab.root);
+      if (ids.length < 2) return;
+      const cur = paneRect(tab.activePane);
+      if (!cur) return;
+      const cx = cur.left + cur.width / 2;
+      const cy = cur.top + cur.height / 2;
+      let best: string | null = null;
+      let bestScore = Infinity;
+      for (const id of ids) {
+        if (id === tab.activePane) continue;
+        const r = paneRect(id);
+        if (!r) continue;
+        const x = r.left + r.width / 2;
+        const y = r.top + r.height / 2;
+        const forward = (x - cx) * dx + (y - cy) * dy;
+        if (forward <= 1) continue;
+        const sideways = Math.abs((x - cx) * dy) + Math.abs((y - cy) * dx);
+        const score = forward + sideways * 2;
+        if (score < bestScore) {
+          bestScore = score;
+          best = id;
+        }
+      }
+      if (best) focusPane(tab.id, best);
+    },
+    [focusPane],
+  );
+
+  const setRatio = useCallback(
+    (tabId: string, splitId: string, ratio: number) => {
+      setTabs((ts) =>
+        ts.map((t) =>
+          t.id === tabId
+            ? { ...t, root: setSplitRatio(t.root, splitId, ratio) }
+            : t,
+        ),
+      );
+    },
+    [],
+  );
+
+  const changePaneUrl = useCallback(
+    (tabId: string, paneId: string, url: string) => {
+      setTabs((ts) =>
+        ts.map((t) =>
+          t.id === tabId ? { ...t, root: setLeafUrl(t.root, paneId, url) } : t,
+        ),
+      );
+    },
+    [],
+  );
+
+  const setTitle = useCallback((tabId: string, title: string) => {
+    setTabs((ts) =>
+      ts.map((t) =>
+        t.id === tabId && t.title !== title ? { ...t, title } : t,
+      ),
+    );
+  }, []);
+
+  const renameTab = useCallback((tabId: string, title: string) => {
+    setTabs((ts) =>
+      ts.map((t) =>
+        t.id === tabId
+          ? title
+            ? { ...t, title, titlePinned: true }
+            : { ...t, titlePinned: false }
+          : t,
+      ),
+    );
+  }, []);
+
+  const cycleTab = useCallback((dir: 1 | -1) => {
+    const list = tabsRef.current;
+    if (list.length < 2) return;
+    const idx = list.findIndex((t) => t.id === activeTabIdRef.current);
+    setActiveTabId(list[(idx + dir + list.length) % list.length].id);
+  }, []);
+
+  // Session events (shell ready, OSC title, PTY exit, link clicks) → state.
+  useEffect(() => {
+    configureSessions({
+      onShell: (paneId, shell) => {
+        const tab = tabsRef.current.find((t) =>
+          leafIds(t.root).includes(paneId),
+        );
+        if (tab && !tab.titlePinned) setTitle(tab.id, shell);
+      },
+      onTitle: (paneId, title) => {
+        const tab = tabsRef.current.find((t) =>
+          leafIds(t.root).includes(paneId),
+        );
+        const pretty = prettyTitle(title);
+        if (tab && !tab.titlePinned && tab.activePane === paneId && pretty)
+          setTitle(tab.id, pretty);
+      },
+      onExit: (paneId) => closePane(paneId, false),
+      onOpenLocalUrl: (paneId, url) => {
+        const tab = tabsRef.current.find((t) =>
+          leafIds(t.root).includes(paneId),
+        );
+        if (tab) openWebPane(tab.id, paneId, url);
+      },
+      getCwd: () => activeWorkspaceRef.current?.path ?? null,
+    });
+  }, [closePane, setTitle, openWebPane]);
+
+  // Links anywhere in the UI (chat markdown, etc.): localhost opens the
+  // in-app browser pane next to the pane it was clicked in; everything else
+  // goes to the system browser. Capture-phase so the webview never navigates.
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      const a = (e.target as HTMLElement).closest?.("a[href]") as HTMLAnchorElement | null;
+      if (!a) return;
+      const href = a.getAttribute("href") ?? "";
+      if (!/^https?:\/\//i.test(href)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (isLocalUrl(href)) {
+        const paneId = (a.closest("[data-pane-id]") as HTMLElement | null)?.dataset.paneId;
+        const tab = paneId
+          ? tabsRef.current.find((t) => leafIds(t.root).includes(paneId))
+          : tabsRef.current.find((t) => t.id === activeTabIdRef.current);
+        if (tab) {
+          openWebPane(tab.id, paneId ?? tab.activePane, href);
+          return;
+        }
+      }
+      openUrl(href).catch(() => {});
+    };
+    document.addEventListener("click", onClick, true);
+    return () => document.removeEventListener("click", onClick, true);
+  }, [openWebPane]);
+
+  // Kill the default WebView right-click menu (Reload / Back / Inspect …);
+  // our own context menus and the terminal handler still run.
+  useEffect(() => {
+    const block = (e: MouseEvent) => e.preventDefault();
+    document.addEventListener("contextmenu", block);
+    return () => document.removeEventListener("contextmenu", block);
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.code === "KeyT") {
+        e.preventDefault();
+        addTab();
+      } else if (e.ctrlKey && e.shiftKey && e.code === "KeyW") {
+        e.preventDefault();
+        const tab = tabsRef.current.find(
+          (t) => t.id === activeTabIdRef.current,
+        );
+        if (tab) closePane(tab.activePane, true);
+      } else if (e.ctrlKey && e.shiftKey && e.code === "KeyD") {
+        e.preventDefault();
+        splitActive("row");
+      } else if (e.ctrlKey && e.shiftKey && e.code === "KeyE") {
+        e.preventDefault();
+        splitActive("col");
+      } else if (e.ctrlKey && e.shiftKey && e.code === "KeyL") {
+        e.preventDefault();
+        const tab = tabsRef.current.find(
+          (t) => t.id === activeTabIdRef.current,
+        );
+        if (tab) openWebPane(tab.id, tab.activePane, DEFAULT_WEB_URL);
+      } else if (e.ctrlKey && e.shiftKey && e.code === "KeyO") {
+        e.preventDefault();
+        setExplorerOpen((o) => !o);
+      } else if (e.ctrlKey && e.shiftKey && e.code === "KeyB") {
+        e.preventDefault();
+        setCollapsed((c) => !c);
+      } else if (e.ctrlKey && e.code === "Tab") {
+        e.preventDefault();
+        cycleTab(e.shiftKey ? -1 : 1);
+      } else if (e.altKey && e.code === "ArrowLeft") {
+        e.preventDefault();
+        navigatePane(-1, 0);
+      } else if (e.altKey && e.code === "ArrowRight") {
+        e.preventDefault();
+        navigatePane(1, 0);
+      } else if (e.altKey && e.code === "ArrowUp") {
+        e.preventDefault();
+        navigatePane(0, -1);
+      } else if (e.altKey && e.code === "ArrowDown") {
+        e.preventDefault();
+        navigatePane(0, 1);
+      } else if (e.ctrlKey && (e.key === "=" || e.key === "+")) {
+        e.preventDefault();
+        adjustFontSize(1);
+      } else if (e.ctrlKey && e.key === "-") {
+        e.preventDefault();
+        adjustFontSize(-1);
+      } else if (e.ctrlKey && e.key === "0") {
+        e.preventDefault();
+        adjustFontSize(0);
+      } else if (e.ctrlKey && e.key === ",") {
+        e.preventDefault();
+        setSettingsOpen((o) => !o);
+      } else if (
+        e.ctrlKey &&
+        ((!e.shiftKey && e.code === "KeyK") || (e.shiftKey && e.code === "KeyP"))
+      ) {
+        e.preventDefault();
+        setPaletteOpen((o) => !o);
+      } else if (e.ctrlKey && !e.shiftKey && /^Digit[1-9]$/.test(e.code)) {
+        e.preventDefault();
+        const t = tabsRef.current[Number(e.code.slice(5)) - 1];
+        if (t) setActiveTabId(t.id);
+      }
+      // Any branch that handled the shortcut called preventDefault(). We're in
+      // the CAPTURE phase on window, so stopping propagation now prevents the
+      // event from descending to xterm's textarea listener — otherwise the
+      // shortcut ALSO reached the shell (Ctrl+K = readline kill-line, Ctrl+1..9
+      // typed digits) because xterm ignores defaultPrevented.
+      if (e.defaultPrevented) e.stopPropagation();
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [addTab, closePane, splitActive, cycleTab, navigatePane, openWebPane]);
+
+  const explorer = exMounted ? (
+    <Explorer
+      root={activeWorkspace?.path ?? null}
+      rootName={activeWorkspace?.name ?? null}
+      width={exOpen ? explorerWidth : 0}
+      side={explorerSide}
+      onOpenFile={openFile}
+    />
+  ) : null;
+  const explorerEdge = exMounted ? (
+    <div className="edge gap" onMouseDown={beginEdgeResize("explorer")} />
+  ) : null;
+  const activeTab = tabs.find((t) => t.id === activeTabId);
+  // The titlebar's folder + branch follow the ACTIVE TAB's own workspace, not
+  // the globally-active one. A workspace-less tab (e.g. a fresh home agent)
+  // shows no folder instead of a stale name left over from another tab — the
+  // activeWorkspace sync bails when a tab has no workspace, so it can go stale.
+  const activeTabWs = activeTab?.workspaceId
+    ? workspaces.list.find((w) => w.id === activeTab.workspaceId) ?? null
+    : null;
 
   return (
-    <div className="main">
-      <TitleBar />
-      <div className="main-body">
+    <div className="app">
+      {/* Simulated macOS traffic lights — only visible in the dev Mac-preview
+          (Ctrl+Shift+M). On a real Mac the OS draws these natively instead. */}
+      <div className="mac-lights" aria-hidden>
+        <span className="mac-light red" />
+        <span className="mac-light yellow" />
+        <span className="mac-light green" />
+      </div>
+      <button
+        className={`app-toggle${collapsed ? " closed" : ""}`}
+        title="Toggle sidebar (Ctrl+Shift+B)"
+        onClick={() => setCollapsed((c) => !c)}
+      >
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <rect x="3" y="4" width="18" height="16" rx="5" />
+          <rect
+            className="tgl-fill"
+            x="6"
+            y="8"
+            width="4.5"
+            height="8"
+            rx="2"
+            fill="currentColor"
+            stroke="none"
+          />
+          <rect className="tgl-outline" x="6" y="8" width="4.5" height="8" rx="2" />
+        </svg>
+      </button>
+      <div
+        className={`rail${collapsed ? " collapsed" : ""}`}
+        style={{ width: collapsed ? 0 : sidebarWidth }}
+      >
+        <div className="rail-top" data-tauri-drag-region>
+          <div className="rail-brand" data-tauri-drag-region />
+        </div>
         <Sidebar
           tabs={tabs}
-          activeTabId={activeTabId}
+          activeId={activeTabId}
+          workspaces={workspaces.list}
+          activeWorkspaceId={workspaces.activeId}
+          branch={branch}
+          utilities={utilities}
+          onAddWorkspace={addWorkspace}
+          onSelectWorkspace={selectWorkspace}
+          onRemoveWorkspace={removeWorkspace}
+          onNewTabInWorkspace={addTabInWorkspace}
+          onMoveTabToWorkspace={moveTabToWorkspace}
+          onOpenBackgroundTerm={openBackgroundTerm}
+          onOpenBgAgent={openBgAgentViewer}
+          onKillBackgroundTerm={killBackgroundTerm}
+          onOpenAgent={() => openAgent("ash")}
+          onRunUtility={runUtility}
+          onAddUtility={() => setUtilEditing("new")}
+          onEditUtility={(u) => setUtilEditing(u)}
+          onRemoveUtility={removeUtility}
+          sshHosts={sshHosts}
+          onRunSsh={runSsh}
+          onAddSsh={() => setSshAdding(true)}
+          onRemoveSsh={removeSshHost}
+          agents={agents}
+          onRunAgent={runAgent}
+          sections={sections}
+          pinned={pinned}
+          onPin={pinItem}
+          onUnpin={unpinItem}
+          onMovePinned={movePinned}
           onSelect={setActiveTabId}
-          onClose={closeTab}
-          onNew={newTab}
-          collapsed={sidebarCollapsed}
+          onClose={requestCloseTab}
+          onNew={addTab}
+          onRename={renameTab}
+          onOpenSearch={() => setPaletteOpen(true)}
+          onCloseAll={() => setConfirmCloseAll(true)}
+          onOpenSettings={() => setSettingsOpen(true)}
         />
-        <div className="pane-area">
-          <PaneLayout
-            node={activeTab.root}
-            tabId={activeTab.id}
-            tabActive={true}
-            activePane={activeTab.activePane}
-            multi={panes.length > 1}
-            onFocus={focusPane}
-            onRatio={setRatio}
-          />
+      </div>
+      {!collapsed && (
+        <div className="edge" onMouseDown={beginEdgeResize("sidebar")} />
+      )}
+      <div className="main">
+        <TitleBar
+          title={activeTab ? activeTab.title : "Welcome"}
+          workspaceName={activeTabWs?.name ?? null}
+          branch={activeTabWs ? branch : null}
+          sidebarOpen={!collapsed}
+        />
+        <div className="main-body">
+          {explorerSide === "left" && explorer}
+          {explorerSide === "left" && explorerEdge}
+          <main className={`content${collapsed ? " inset-left" : ""}`}>
+            {tabs.length === 0 ? (
+              <Welcome
+                workspaces={workspaces.list}
+                onNewTerminal={addTab}
+                onOpenFolder={startInFolder}
+                onOpenWorkspace={addTabInWorkspace}
+                onConnectSsh={() => setSshAdding(true)}
+              />
+            ) : (
+              tabs.map((tab) => (
+                <div
+                  key={tab.id}
+                  className={`tab-view${tab.id === activeTabId ? "" : " hidden"}`}
+                >
+                  <PaneLayout
+                    node={tab.root}
+                    tabId={tab.id}
+                    tabActive={tab.id === activeTabId}
+                    activePane={tab.activePane}
+                    multi={leafIds(tab.root).length > 1}
+                    onFocus={focusPane}
+                    onRatio={setRatio}
+                    onUrlChange={changePaneUrl}
+                    onClosePane={closePaneKill}
+                    onRename={renameTab}
+                  />
+                </div>
+              ))
+            )}
+          </main>
+          {explorerSide === "right" && explorerEdge}
+          {explorerSide === "right" && explorer}
         </div>
       </div>
+      {paletteOpen && (
+        <CommandPalette
+          tabs={tabs}
+          workspaces={workspaces.list}
+          onSelectTab={setActiveTabId}
+          onNewTab={addTab}
+          onOpenFolder={addWorkspace}
+          onOpenSettings={() => setSettingsOpen(true)}
+          onImport={openImportedChat}
+          onClose={() => setPaletteOpen(false)}
+        />
+      )}
+      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
+      {confirmClose && (
+        <div className={`modal-backdrop${confirmClosing ? " closing" : ""}`} onMouseDown={() => closeConfirm()}>
+          <div className={`confirm-modal${confirmClosing ? " closing" : ""}`} onMouseDown={(e) => e.stopPropagation()}>
+            <h3>Close chat?</h3>
+            <p>
+              “{confirmClose.title}” and its history will be deleted. This
+              can’t be undone.
+            </p>
+            <div className="confirm-actions">
+              <button className="cancel" onClick={() => closeConfirm()}>
+                Cancel
+              </button>
+              <button
+                className="danger"
+                onClick={() => {
+                  const { tabId, paneId } = confirmClose;
+                  const tab = tabsRef.current.find((t) => t.id === tabId);
+                  if (!tab) {
+                    closeConfirm();
+                    return;
+                  }
+                  // One agent pane inside a multi-leaf split: remove ONLY that
+                  // pane and its chat; leave every sibling terminal/chat intact.
+                  if (paneId && leaves(tab.root).length > 1) {
+                    removeChat(paneId);
+                    discardSandbox(paneId);
+                    disposeSession(paneId);
+                    const newRoot = removeLeaf(tab.root, paneId);
+                    if (newRoot)
+                      setTabs((ts) =>
+                        ts.map((t) =>
+                          t.id === tab.id
+                            ? {
+                                ...t,
+                                root: newRoot,
+                                activePane: leafIds(newRoot).includes(t.activePane)
+                                  ? t.activePane
+                                  : firstLeaf(newRoot),
+                              }
+                            : t,
+                        ),
+                      );
+                    closeConfirm();
+                    return;
+                  }
+                  // Whole tab (last pane, or a sidebar tab-close): delete every
+                  // agent chat in it, then close the tab.
+                  leaves(tab.root).forEach((l) => {
+                    if (l.kind === "agent") {
+                      removeChat(l.id);
+                      discardSandbox(l.id);
+                    }
+                  });
+                  closeTab(tabId);
+                  closeConfirm();
+                }}
+              >
+                Close chat
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {confirmCloseAll && (
+        <div className={`modal-backdrop${confirmAllClosing ? " closing" : ""}`} onMouseDown={() => closeConfirmAll()}>
+          <div className={`confirm-modal${confirmAllClosing ? " closing" : ""}`} onMouseDown={(e) => e.stopPropagation()}>
+            <h3>Close everything?</h3>
+            <p>
+              All terminals will be closed and all agent chats deleted. This
+              can’t be undone.
+            </p>
+            <div className="confirm-actions">
+              <button className="cancel" onClick={() => closeConfirmAll()}>
+                Cancel
+              </button>
+              <button
+                className="danger"
+                onClick={() => {
+                  closeAllTabs();
+                  closeConfirmAll();
+                }}
+              >
+                Close all
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {utilEditing !== null && (
+        <UtilityModal
+          initial={utilEditing === "new" ? null : utilEditing}
+          onSave={(data) =>
+            saveUtility(data, utilEditing === "new" ? undefined : utilEditing)
+          }
+          onClose={() => setUtilEditing(null)}
+        />
+      )}
+      {sshAdding && (
+        <SshModal onSave={addSshHost} onClose={() => setSshAdding(false)} />
+      )}
+      {runOpen && (
+        <RunModal
+          projectName={activeWorkspace?.name ?? null}
+          runs={runs}
+          onRun={execRun}
+          onSave={persistRuns}
+          onClose={() => setRunOpen(false)}
+        />
+      )}
     </div>
   );
-}
-
-// Local copy of setSplitRatio to avoid pulling the whole layout module surface
-// through an import cycle — the helper is tiny and stable.
-function setSplitRatioLocal(node: import("./lib/layout").PaneNode, splitId: string, ratio: number): import("./lib/layout").PaneNode {
-  if (node.type === "leaf") return node;
-  if (node.id === splitId) return { ...node, ratio };
-  return { ...node, a: setSplitRatioLocal(node.a, splitId, ratio), b: setSplitRatioLocal(node.b, splitId, ratio) };
 }

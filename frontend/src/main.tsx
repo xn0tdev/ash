@@ -1,10 +1,155 @@
-import React from 'react'
-import {createRoot} from 'react-dom/client'
-import './style.css'
-import '@xterm/xterm/css/xterm.css'
-import App from './App'
+import ReactDOM from "react-dom/client";
+import App from "./App";
+import { applyAppTheme, applyUiScale, getSettings, loadSettings } from "./lib/settings";
+import { loadChats } from "./lib/chat-store";
 
-const container = document.getElementById('root')
-const root = createRoot(container!)
-// No StrictMode: its double-mounted effects would spawn every ConPTY twice.
-root.render(<App/>)
+// UI font (app chrome). Geist Mono / JetBrains Mono below stay for the terminal.
+import "@fontsource/inter/400.css";
+import "@fontsource/inter/500.css";
+import "@fontsource/inter/600.css";
+import "@fontsource/inter/cyrillic-400.css";
+import "@fontsource/inter/cyrillic-500.css";
+import "@fontsource/inter/cyrillic-600.css";
+import "@fontsource/geist-mono/400.css";
+import "@fontsource/geist-mono/cyrillic-400.css";
+import "@fontsource/jetbrains-mono/400.css";
+import "@fontsource/jetbrains-mono/cyrillic-400.css";
+// extra terminal monospace faces for variety (weight 400 + cyrillic where the
+// family ships it — keeps the terminal readable on ru/cyrillic output).
+import "@fontsource/fira-code/400.css";
+import "@fontsource/fira-code/cyrillic-400.css";
+import "@fontsource/ibm-plex-mono/400.css";
+import "@fontsource/ibm-plex-mono/cyrillic-400.css";
+import "@fontsource/source-code-pro/400.css";
+import "@fontsource/source-code-pro/cyrillic-400.css";
+import "@fontsource/inconsolata/400.css";
+import "@fontsource/space-mono/400.css";
+import "@fontsource/martian-mono/400.css";
+import "@fontsource/martian-mono/cyrillic-400.css";
+// Split from the former single style.css. base.css MUST load first (tokens +
+// reset); the rest are per-concern sheets loaded in the original cascade order.
+import "./styles/base.css";
+import "./styles/layout.css";
+import "./styles/sidebar.css";
+import "./styles/command-palette.css";
+import "./styles/terminal.css";
+import "./styles/welcome.css";
+import "./styles/browser.css";
+import "./styles/file-viewer.css";
+import "./styles/agent-chat.css";
+import "./styles/agent-composer.css";
+import "./styles/explorer.css";
+import "./styles/context-menu.css";
+import "./styles/toast.css";
+import "./styles/modals.css";
+import "./styles/settings.css";
+import "./styles/xterm.css";
+
+
+// macOS uses native traffic-light window controls (see tauri.macos.conf.json),
+// so tag the root: the layout reserves their top-left space and TitleBar hides
+// our custom Windows-style buttons. A dev-only "Mac preview" (Ctrl+Shift+M)
+// forces the same layout on Windows and draws SIMULATED traffic lights so the
+// Mac look can be eyeballed without a Mac. UA sniffing is reliable here.
+const realMac = navigator.userAgent.includes("Macintosh");
+const macPreview = localStorage.getItem("ash.macPreview") === "1";
+if (realMac || macPreview) document.documentElement.classList.add("mac");
+if (macPreview && !realMac) document.documentElement.classList.add("mac-preview");
+
+// Toggle the dev Mac-preview and reload so the one-shot detection above re-runs.
+window.addEventListener("keydown", (e) => {
+  if (e.ctrlKey && e.shiftKey && (e.key === "m" || e.key === "M")) {
+    e.preventDefault();
+    localStorage.setItem("ash.macPreview", macPreview ? "0" : "1");
+    location.reload();
+  }
+});
+
+// Strip native `title` tooltips app-wide — desktop apps don't show them.
+function stripTitlesIn(el: Element) {
+  if (el.hasAttribute("title")) el.removeAttribute("title");
+  el.querySelectorAll("[title]").forEach((n) => n.removeAttribute("title"));
+}
+new MutationObserver((mutations) => {
+  for (const m of mutations) {
+    if (m.type === "attributes" && m.target instanceof Element) {
+      m.target.removeAttribute("title");
+    } else {
+      m.addedNodes.forEach((n) => {
+        // skip terminal DOM churn — xterm nodes never carry titles
+        if (n instanceof Element && !n.closest(".term-container")) {
+          stripTitlesIn(n);
+        }
+      });
+    }
+  }
+}).observe(document.documentElement, {
+  subtree: true,
+  childList: true,
+  attributeFilter: ["title"],
+});
+
+async function start() {
+  // Kick off every independent startup read at once instead of serially:
+  //  - settings.json (needed for the theme, so we await it first),
+  //  - all chat files (App builds its initial tabs from them),
+  //  - the fonts the terminal measures its cell size against.
+  // The @font-face rules are already registered by the CSS imports above, so
+  // font loading can begin immediately, overlapping the disk reads.
+  const settingsReady = loadSettings();
+  const chatsReady = loadChats().catch(() => {});
+  // Terminals measure cell size at creation — the mono font must be in first.
+  // Load a Cyrillic sample too so that subset is ready before any RU text.
+  // Preload EVERY selectable terminal mono face (not just the default) so that
+  // switching fonts in Settings doesn't stall on a first-use woff2 fetch —
+  // that fetch was the lag that froze the dropdown animation mid-switch.
+  const monoFaces = [
+    '"Geist Mono"',
+    '"JetBrains Mono"',
+    '"Cascadia Mono"',
+    '"Cascadia Code"',
+    '"Fira Code"',
+    '"IBM Plex Mono"',
+    '"Source Code Pro"',
+    '"Inconsolata"',
+    '"Space Mono"',
+    '"Martian Mono"',
+  ];
+  const fontsReady = Promise.all([
+    ...monoFaces.flatMap((f) => [
+      document.fonts.load(`13px ${f}`),
+      document.fonts.load(`13px ${f}`, "Я"),
+    ]),
+    document.fonts.load('12px "Inter"'),
+    document.fonts.load('12px "Inter"', "Я"),
+  ]).catch(() => {
+    // best-effort; fallback fonts still render
+  });
+
+  // Theme needs settings — apply as soon as they're in so there's no flash.
+  await settingsReady;
+  applyAppTheme(getSettings().theme);
+  applyUiScale();
+
+  // Block the first render only on what it truly needs: the restored tabs and
+  // the terminal fonts (both already in flight, overlapping each other).
+  await Promise.all([chatsReady, fontsReady]);
+
+  // No StrictMode: its double-mounted effects would spawn every PTY twice.
+  ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
+    <App />,
+  );
+
+  // The app is committed — fade the boot splash (index.html) away.
+  const splash = document.getElementById("splash");
+  if (splash) {
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        splash.classList.add("out");
+        window.setTimeout(() => splash.remove(), 300);
+      }),
+    );
+  }
+}
+
+start();

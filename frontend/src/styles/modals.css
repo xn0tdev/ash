@@ -1,0 +1,430 @@
+/* ── Modals ────────────────────────────────────────────── */
+
+/* compact square-ish confirm dialog (close chat) */
+.confirm-modal {
+  width: 300px;
+  max-width: calc(100vw - 48px);
+  padding: 20px 20px 18px;
+  border-radius: 24px;
+  corner-shape: squircle;
+  background: var(--surface);
+  /* no drop shadow — the dimmed + blurred backdrop already separates the
+     dialog from the chrome; a heavy box-shadow read as a sooty edge on light
+     themes. Re-enable with box-shadow if a lift is ever needed. */
+  /* Smooth grow-in, critically damped (no overshoot) + pure scale — no
+     translateY. Overshoot made the multi-line body text visibly rescale and
+     shift mid-animation (the dialog is passive, not a flicked card, so bounce
+     reads wrong per §behavior); a vertical lift made the last line "drop".
+     Scale-only + opacity keeps the text stable while the surface arrives. */
+  animation: confirm-pop 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+  transform-origin: 50% 50%;
+}
+@keyframes confirm-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.confirm-modal h3 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+.confirm-modal p {
+  margin: 0 0 16px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.confirm-actions button {
+  height: 34px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 12px;
+  corner-shape: squircle;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: default;
+  transition: background-color 0.1s ease;
+}
+.confirm-actions .cancel {
+  background: var(--raise);
+  color: var(--text);
+}
+.confirm-actions .cancel:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.confirm-actions .danger {
+  background: rgba(230, 110, 110, 0.18);
+  color: #f0a3a3;
+}
+.confirm-actions .danger:hover {
+  background: rgba(230, 110, 110, 0.26);
+}
+.confirm-actions .primary {
+  background: var(--text);
+  color: var(--bg);
+}
+.confirm-actions .primary:hover {
+  background: #fff;
+}
+.confirm-actions button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* ── Safe-mode sandbox merge ─────────────────────────────── */
+.sandbox-modal {
+  width: 460px;
+}
+/* "setting up safe mode" — a soft setup header instead of a bold announcement */
+.safe-setup-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.safe-setup-title {
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--text);
+}
+.sandbox-modal p {
+  margin-bottom: 14px;
+}
+.sandbox-error {
+  margin-bottom: 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #f0a3a3;
+}
+.sandbox-empty {
+  margin-bottom: 18px;
+  padding: 18px 0;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--faint);
+}
+.sandbox-changes {
+  margin-bottom: 18px;
+  max-height: 320px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.sandbox-change {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 6px;
+  border-radius: 8px;
+  corner-shape: squircle;
+  font-size: 12.5px;
+  cursor: default;
+}
+.sandbox-change:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+.sandbox-change input {
+  flex-shrink: 0;
+  accent-color: var(--muted);
+}
+.sandbox-status {
+  flex-shrink: 0;
+  width: 52px;
+  font-size: 9.5px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.sandbox-status.s-added {
+  color: var(--text);
+}
+.sandbox-status.s-deleted {
+  color: #f0a3a3;
+}
+.sandbox-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  animation: sp-fade 0.12s ease;
+}
+.modal-backdrop.closing {
+  animation: sp-fade 0.14s ease reverse forwards;
+  pointer-events: none;
+}
+
+.modal {
+  width: 470px;
+  max-width: calc(100vw - 48px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 6px 16px 14px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+  animation: sp-pop 0.13s ease;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 38px;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.field label {
+  font-size: 11px;
+  color: var(--faint);
+}
+
+.field input {
+  height: 28px;
+  padding: 0 9px;
+  border: none;
+  border-radius: 7px;
+  background: var(--raise);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+  outline: none;
+  user-select: text;
+  width: 100%;
+}
+
+.field input:focus {
+  filter: brightness(1.2);
+}
+
+.task-input {
+  width: 100%;
+  padding: 8px 9px;
+  border: none;
+  border-radius: 7px;
+  background: var(--raise);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12.5px;
+  line-height: 1.5;
+  outline: none;
+  resize: vertical;
+  min-height: 72px;
+  user-select: text;
+}
+
+.task-input:focus {
+  filter: brightness(1.2);
+}
+
+/* native picker glyphs (time/date) inherit dark scheme; keep them subtle */
+input::-webkit-calendar-picker-indicator {
+  opacity: 0.75;
+}
+
+.field-row {
+  display: flex;
+  gap: 6px;
+}
+
+.field-row input {
+  flex: 1;
+}
+
+.btn {
+  height: 28px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 7px;
+  background: var(--raise);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: default;
+}
+
+.btn:hover {
+  filter: brightness(1.2);
+}
+
+.btn.primary {
+  background: var(--text);
+  color: var(--bg);
+  font-weight: 500;
+}
+
+.btn.primary:disabled {
+  opacity: 0.4;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.field-row2 {
+  display: flex;
+  gap: 10px;
+}
+
+.field-row2 .field {
+  flex: 1;
+}
+
+.field select,
+.field-select {
+  height: 28px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 7px;
+  background: var(--raise);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+  outline: none;
+  width: 100%;
+}
+
+.modal-hint {
+  font-size: 11px;
+  color: var(--faint);
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+.modal-hint code {
+  font-family: "Geist Mono", Consolas, monospace;
+  color: var(--muted);
+}
+
+/* run list */
+.run-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 10px;
+}
+
+.run-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 7px;
+  color: var(--muted);
+}
+
+.run-row:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.run-type {
+  display: flex;
+  color: var(--faint);
+  flex-shrink: 0;
+}
+
+.run-row:hover .run-type {
+  color: var(--muted);
+}
+
+.run-name {
+  font-size: 12.5px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.run-detail {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: "Geist Mono", Consolas, monospace;
+  font-size: 11px;
+  color: var(--faint);
+}
+
+.run-row .row-btn {
+  opacity: 0;
+}
+
+.run-row:hover .row-btn {
+  opacity: 1;
+}
+
+.run-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.run-add {
+  width: 100%;
+  justify-content: flex-start;
+  height: 30px;
+  margin-top: 2px;
+}
+
+/* segmented control */
+.seg {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  margin-bottom: 10px;
+  border-radius: 8px;
+  corner-shape: squircle;
+  background: var(--raise);
+}
+
+.seg button {
+  flex: 1;
+  height: 26px;
+  border: none;
+  border-radius: 6px;
+  corner-shape: squircle;
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: default;
+}
+
+.seg button.on {
+  background: var(--surface);
+  color: var(--text);
+}

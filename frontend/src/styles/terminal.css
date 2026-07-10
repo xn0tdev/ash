@@ -1,0 +1,47 @@
+/* ── Terminal area ─────────────────────────────────────── */
+
+.content {
+  flex: 1;
+  position: relative;
+  min-width: 0;
+  /* flush against the window's bottom/right — the pane's own rounding is the
+     only separation there; the small left gap keeps it off the sidebar */
+  margin: 0 0 0 2px;
+  /* isolate the pane subtree's layout so a rail/explorer width animation
+     doesn't force a full re-layout of every pane inside — only each pane's
+     own size change (already debounced via ResizeObserver) reflows it */
+  contain: layout;
+  /* no margin-left transition — it's a 2px layout-property shift (invisible)
+     and animating it reflows the whole content tree every frame for nothing */
+}
+
+/* no lag while dragging the resize edge */
+body.dragging .content {
+  transition: none;
+}
+
+/* sidebar closed: give the terminal card a proper left inset (no thin sliver) */
+/* Sidebar collapsed: there's no sidebar to clear, so drop the left gap entirely
+   and sit flush against the window's left edge. */
+.content.inset-left {
+  margin-left: 0;
+}
+
+/* no double gap next to the explorer — the drag zone is the gap */
+.content:has(+ .edge.gap) {
+  margin-right: 0;
+}
+
+.edge.gap + .content {
+  margin-left: 0;
+}
+
+.tab-view {
+  position: absolute;
+  inset: 0;
+  display: flex;
+}
+
+.tab-view.hidden {
+  visibility: hidden;
+}

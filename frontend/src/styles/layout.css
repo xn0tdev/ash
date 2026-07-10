@@ -1,0 +1,304 @@
+/* ── Layout: dark rail + light content panel ───────────── */
+
+.app {
+  display: flex;
+  /* Whole-UI scale. `zoom` sits on .app (not html) and the box is pre-scaled by
+     1/zoom so, once zoomed, it still fills the window exactly — no dead strip at
+     the edges (viewport units aren't rescaled by zoom, so plain 100vh would
+     leave a gap). */
+  zoom: var(--ui-zoom);
+  width: calc(100vw / var(--ui-zoom));
+  height: calc(100vh / var(--ui-zoom));
+  position: relative;
+}
+
+/* Single fixed sidebar toggle — same spot whether the sidebar is open or not. */
+.app-toggle {
+  position: absolute;
+  top: 7px;
+  /* align the toggle icon's left edge with the sidebar row icons below it
+     (sidebar padding 8 + row padding 8 = 16px; 20px icon in a 28px button is
+     5px inset, so left 9 puts the icon at 14px) — sits neatly over the
+     list, level with the rail-top row */
+  left: 9px;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 9px;
+  corner-shape: squircle;
+  background: transparent;
+  color: var(--icon);
+  cursor: default;
+  transition: background-color 0.1s ease, color 0.1s ease;
+}
+
+.app-toggle:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+/* toggle icon: cross-fade filled ⇄ outline panel by alpha */
+.app-toggle .tgl-fill,
+.app-toggle .tgl-outline {
+  transition: opacity 0.18s ease;
+}
+
+.app-toggle .tgl-outline {
+  opacity: 0;
+}
+
+.app-toggle.closed .tgl-fill {
+  opacity: 0;
+}
+
+.app-toggle.closed .tgl-outline {
+  opacity: 1;
+}
+
+.rail {
+  flex-shrink: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  /* width drives a flex reflow every frame, so keep the motion short and on the
+     same curve as the sidebar slide + opacity so the three read as one clean
+     open instead of a two-speed stagger */
+  transition:
+    width 0.22s cubic-bezier(0.32, 0.72, 0, 1),
+    opacity 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.rail.collapsed {
+  opacity: 0;
+}
+
+/* no lag while dragging the resize edge */
+body.dragging .rail {
+  transition: none;
+}
+
+/* keep sidebar content at full width while the rail collapses to 0 */
+.rail .sidebar {
+  min-width: 160px;
+  /* slide rides in lockstep with the rail — same curve + duration so the
+     content eases in from a hair to the left in perfect sync */
+  transition: transform 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.rail.collapsed .sidebar {
+  transform: translateX(-12px);
+}
+
+/* no lag while dragging the resize edge */
+body.dragging .rail .sidebar {
+  transition: none;
+}
+
+.rail-top {
+  height: 42px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 9px 0 44px;
+}
+
+.rail-brand {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.rail-brand svg {
+  color: var(--icon);
+  flex-shrink: 0;
+}
+
+.tb-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 9px;
+  corner-shape: squircle;
+  background: transparent;
+  color: var(--icon);
+  cursor: default;
+}
+
+.tb-btn:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.tb-btn.on {
+  color: var(--text);
+}
+
+.edge {
+  position: relative;
+  z-index: 5;
+  flex: 0 0 4px;
+  margin: 0 -2px;
+  cursor: col-resize;
+}
+
+/* separator inside the light panel (explorer ↔ terminal); cursor conveys drag */
+.edge.gap {
+  flex: 0 0 6px;
+  margin: 0;
+  animation: sp-fade 0.16s ease;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  overflow: hidden;
+  /* isolate so a rail/explorer width animation doesn't cascade a full re-layout
+     into this subtree — only each pane's own size change reflows it */
+  contain: layout;
+}
+
+.main-head {
+  height: 42px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  padding-left: 14px;
+  transition: padding-left 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* sidebar closed: clear space at the header's left for the fixed toggle */
+.main-head.with-toggle {
+  padding-left: 44px;
+}
+
+/* macOS: native traffic lights occupy the window's top-left. Push our sidebar
+   toggle to their right, and when the sidebar is collapsed clear the header
+   title past both the lights and the toggle. (No effect on Windows/Linux.) */
+.mac .app-toggle {
+  left: 78px;
+}
+.mac .main-head.with-toggle {
+  padding-left: 114px;
+}
+
+/* dev Mac-preview: simulated traffic lights at the window's top-left. Hidden by
+   default; a real Mac shows the OS's own lights, so this only renders under the
+   .mac-preview flag (Ctrl+Shift+M on Windows). */
+.mac-lights {
+  display: none;
+}
+.mac-preview .mac-lights {
+  position: fixed;
+  top: 14px;
+  left: 13px;
+  z-index: 100;
+  display: flex;
+  gap: 8px;
+  pointer-events: none;
+}
+.mac-light {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+.mac-light.red {
+  background: #ff5f57;
+}
+.mac-light.yellow {
+  background: #febc2e;
+}
+.mac-light.green {
+  background: #28c840;
+}
+
+.head-title {
+  min-width: 0;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.head-ws {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 12px;
+  font-size: 12px;
+  color: var(--faint);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.head-ws svg {
+  margin-left: 4px;
+  flex-shrink: 0;
+}
+
+.head-spacer {
+  flex: 1;
+  height: 100%;
+  min-width: 20px;
+}
+
+.head-right {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  gap: 3px;
+  padding-right: 4px;
+}
+
+.window-controls {
+  display: flex;
+  height: 100%;
+  margin-left: 8px;
+}
+
+.wc-btn {
+  width: 42px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: default;
+}
+
+.wc-btn:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.wc-close:hover {
+  background: #e81123;
+  color: #fff;
+}
+
+.main-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}

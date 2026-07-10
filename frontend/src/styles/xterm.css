@@ -1,0 +1,29 @@
+/* ── xterm ─────────────────────────────────────────────── */
+
+/* Kill xterm.css's default black viewport background — it painted a
+   black band wherever the row grid doesn't cover the container. */
+.xterm .xterm-viewport {
+  background-color: transparent !important;
+}
+
+/* xterm v6 draws its own VS Code-style overlay scrollbar — hide the
+   native viewport scrollbar so there's no fat bar / arrows. */
+.xterm .xterm-viewport::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+/* thin, rounded overlay scrollbar; no arrow buttons */
+.xterm .xterm-scrollable-element > .scrollbar.vertical {
+  width: 11px !important;
+}
+
+.xterm .xterm-scrollable-element > .scrollbar.vertical > .slider {
+  width: 6px !important;
+  left: 3px !important;
+  border-radius: 3px !important;
+}
+
+.xterm .xterm-scrollable-element > .scrollbar > .scra {
+  display: none !important;
+}
