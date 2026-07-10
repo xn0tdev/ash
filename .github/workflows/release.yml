@@ -34,6 +34,12 @@ jobs:
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.13.0
 
+      - name: Install NSIS (for the Windows installer)
+        # windows-latest doesn't ship makensis; wails build -nsis skips the
+        # installer with a warning if it's absent. Chocolatey is preinstalled
+        # on GitHub-hosted Windows runners.
+        run: choco install nsis -y --no-progress
+
       - name: Resolve version
         id: ver
         shell: bash
@@ -55,8 +61,12 @@ jobs:
           $ver = "${{ steps.ver.outputs.version }}"
           # Bare binary — the in-app self-updater downloads exactly this name.
           Copy-Item "build\bin\Ash.exe" "staging\Ash.exe"
-          # Installer — friendlier name with the version, so users know which
-          # release they're installing from the Downloads folder.
+          # Installer — friendlier name with the version. If wails skipped it
+          # (makensis missing), fail loudly so we notice instead of shipping a
+          # release with no installer.
+          if (-not (Test-Path "build\bin\Ash-amd64-installer.exe")) {
+            throw "NSIS installer not built — check the makensis install step"
+          }
           Copy-Item "build\bin\Ash-amd64-installer.exe" "staging\Ash-Setup-v$ver.exe"
           Get-ChildItem staging | ForEach-Object {
             Write-Host "Asset: $($_.Name) — $($_.Length) bytes"
