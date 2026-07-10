@@ -1251,8 +1251,11 @@ export default function App() {
         setUpdateOpen(true);
       }
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    // capture: true — fire BEFORE xterm's terminal keydown can stopPropagation
+    // (same reason the modal Escape handler uses capture), so the demo keybind
+    // works even while a terminal pane is focused.
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
   }, [isDevChannel]);
 
   // Session events (shell ready, OSC title, PTY exit, link clicks) → state.
