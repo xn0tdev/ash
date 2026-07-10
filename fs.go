@@ -21,7 +21,8 @@ func NewFs() *Fs { return &Fs{} }
 // already expects from list_dir.
 type DirItem struct {
 	Name  string `json:"name"`
-	IsDir bool   `json:"isDir"`
+	Path  string `json:"path"`
+	IsDir bool   `json:"is_dir"`
 	Size  int64  `json:"size"`
 }
 
@@ -59,9 +60,10 @@ func (Fs) DeletePath(path string) error {
 	return err
 }
 
-// ListDir lists one directory level, sorted: dirs first then files, both
-// alphabetical. Hidden entries (leading dot) are included — the frontend
-// filters them per-context (explorer vs skill discovery).
+// ListDir lists one directory level: name, absolute path, is_dir, size.
+// Sorted dirs-first then alphabetical (case-insensitive); truncated to 1000
+// entries (matches Ash's fs.rs). The `path` field is absolute so the frontend
+// can recurse / open files without re-joining.
 func (Fs) ListDir(path string) ([]DirItem, error) {
 	entries, err := os.ReadDir(path)
 	if err != nil {
@@ -70,22 +72,26 @@ func (Fs) ListDir(path string) ([]DirItem, error) {
 	items := make([]DirItem, 0, len(entries))
 	for _, e := range entries {
 		info, err := e.Info()
-		if err != nil {
-			continue
+		var size int64
+		if err == nil {
+			size = info.Size()
 		}
 		items = append(items, DirItem{
 			Name:  e.Name(),
+			Path:  filepath.Join(path, e.Name()),
 			IsDir: e.IsDir(),
-			Size:  info.Size(),
+			Size:  size,
 		})
 	}
-	// dirs first, then files; alphabetical within each group.
 	sort.SliceStable(items, func(i, j int) bool {
 		if items[i].IsDir != items[j].IsDir {
-			return items[i].IsDir
+			return items[i].IsDir // dirs first
 		}
 		return strings.ToLower(items[i].Name) < strings.ToLower(items[j].Name)
 	})
+	if len(items) > 1000 {
+		items = items[:1000]
+	}
 	return items, nil
 }
 

@@ -2,7 +2,8 @@ export namespace main {
 	
 	export class DirItem {
 	    name: string;
-	    isDir: boolean;
+	    path: string;
+	    is_dir: boolean;
 	    size: number;
 	
 	    static createFrom(source: any = {}) {
@@ -12,7 +13,8 @@ export namespace main {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
-	        this.isDir = source["isDir"];
+	        this.path = source["path"];
+	        this.is_dir = source["is_dir"];
 	        this.size = source["size"];
 	    }
 	}

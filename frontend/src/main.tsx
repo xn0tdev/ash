@@ -90,6 +90,7 @@ new MutationObserver((mutations) => {
 });
 
 async function start() {
+  try {
   // Kick off every independent startup read at once instead of serially:
   //  - settings.json (needed for the theme, so we await it first),
   //  - all chat files (App builds its initial tabs from them),
@@ -139,6 +140,19 @@ async function start() {
   ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <App />,
   );
+  } catch (e) {
+    // Surface startup failures on-screen instead of leaving the gray splash —
+    // the Wails port's shim/binding mismatches show up here first.
+    const splash = document.getElementById("splash");
+    if (splash) splash.remove();
+    const root = document.getElementById("root")!;
+    root.innerHTML =
+      '<div style="font-family:Consolas,monospace;color:#ff6369;padding:24px;font-size:13px;white-space:pre-wrap">' +
+      "Ash failed to start:\n\n" + String(e) + "\n\n" +
+      (e instanceof Error ? e.stack ?? "" : "") +
+      "</div>";
+    return;
+  }
 
   // The app is committed — fade the boot splash (index.html) away.
   const splash = document.getElementById("splash");
