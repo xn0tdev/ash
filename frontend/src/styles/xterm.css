@@ -23,6 +23,14 @@
   border-radius: 3px !important;
 }
 
+/* Hide the up/down arrow buttons on the scrollbar (the small chevron squares
+   at the top/bottom of the track) — keep only the draggable slider. */
 .xterm .xterm-scrollable-element > .scrollbar > .scra {
+  display: none !important;
+}
+/* Belt-and-suspenders: any arrow-icon element xterm v6 renders for the
+   scroll buttons. */
+.xterm .xterm-scrollable-element > .scrollbar > .scrollbar-button,
+.xterm .xterm-scrollable-element > .scrollbar > .arrow {
   display: none !important;
 }

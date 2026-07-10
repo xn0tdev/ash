@@ -33,6 +33,10 @@ a,
   /* Whole-UI scale, applied to .app (compensated so it still fills the window).
      Set at runtime from settings; 1 = 100%. */
   --ui-zoom: 1;
+  /* Terminal pane inset + radius fallbacks (applyAppTheme sets the real
+     values from Settings). */
+  --term-pad: 10px;
+  --term-radius: 18px;
 
   font-family: "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui,
     sans-serif;

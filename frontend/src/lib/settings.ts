@@ -95,6 +95,11 @@ export interface Settings {
   fontSize: number;
   /** Whole-UI scale (1 = 100%). Applied as a zoom on the app root. */
   uiScale: number;
+  /** Inset of the xterm viewport inside its pane — the visible gap between the
+   * app surface and the terminal grid. Driven by --term-pad CSS var. */
+  termPad: number;
+  /** Corner radius of the terminal pane. Driven by --term-radius CSS var. */
+  termRadius: number;
   explorerSide: "left" | "right";
   sidebarWidth: number;
   explorerWidth: number;
@@ -114,6 +119,8 @@ const DEFAULTS: Settings = {
   font: "geist-mono",
   fontSize: DEFAULT_FONT_SIZE,
   uiScale: 0.9,
+  termPad: 10,
+  termRadius: 18,
   explorerSide: "right",
   sidebarWidth: 190,
   explorerWidth: 230,
@@ -181,6 +188,10 @@ export function applyAppTheme(themeId: string) {
   // dirt on light surfaces); on dark themes plain black blends with the
   // already-dark backdrop so a lift reads without a hard edge.
   root.setProperty("--shadow", current.themeLight ? p.text : "#000000");
+  // Terminal pane inset + corner radius (Settings > Terminal). The .pane uses
+  // these so the gap between the app surface and the xterm grid is tunable.
+  root.setProperty("--term-pad", `${current.termPad}px`);
+  root.setProperty("--term-radius", `${current.termRadius}px`);
   // the html element paints the area behind everything (startup, overscroll)
   root.setProperty("background", p.bg);
   root.setProperty("color-scheme", current.themeLight ? "light" : "dark");
@@ -376,7 +387,7 @@ export function updateSettings(patch: Partial<Settings>) {
   // update synchronously so the UI and live terminals stay responsive.
   clearTimeout(persistTimer);
   persistTimer = window.setTimeout(persistSettings, 250);
-  if (patch.theme || patch.themeLight !== undefined) applyAppTheme(current.theme);
+  if (patch.theme || patch.themeLight !== undefined || patch.termPad !== undefined || patch.termRadius !== undefined) applyAppTheme(current.theme);
   if (patch.uiScale !== undefined) applyUiScale();
   listeners.forEach((fn) => fn(current));
 }

@@ -635,6 +635,32 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                 <h3>Terminal</h3>
                 <div className="setting-row">
                   <div className="setting-info">
+                    <label>Padding</label>
+                    <span className="setting-hint">
+                      Space between the app surface and the terminal grid
+                    </span>
+                  </div>
+                  <Stepper
+                    value={settings.termPad}
+                    min={0}
+                    max={32}
+                    onChange={(v) => apply({ termPad: v })}
+                  />
+                </div>
+                <div className="setting-row">
+                  <div className="setting-info">
+                    <label>Corner radius</label>
+                    <span className="setting-hint">Rounding of the terminal pane corners</span>
+                  </div>
+                  <Stepper
+                    value={settings.termRadius}
+                    min={0}
+                    max={36}
+                    onChange={(v) => apply({ termRadius: v })}
+                  />
+                </div>
+                <div className="setting-row">
+                  <div className="setting-info">
                     <label>Clear on exit</label>
                     <span className="setting-hint">
                       Wipe data when the app quits — chats are deleted from disk,
