@@ -77,7 +77,12 @@ body,
 body {
   background: var(--bg);
   user-select: none;
-  cursor: default;
+  /* No explicit cursor here: Wails' frameless resize sets the cursor on
+     documentElement (html) at the window edges (col/row/nwse-resize). A
+     `cursor: default` on body would override html's cursor and hide the resize
+     arrows. Inheriting html's cursor keeps the arrow everywhere in-app while
+     letting the edge resize cursors show. The app's own `cursor: default` on
+     its surfaces provides the arrow where needed. */
 }
 
 /* Subtle hover feedback + quick, native-feeling pop/fade for popovers.
