@@ -15,6 +15,7 @@ const STAGE_LABEL: Record<UpdateStage, string> = {
   restarting: "Restarting…",
   error: "Update failed",
   "up-to-date": "You're up to date",
+  demo: "Downloading…", // demo masquerades as downloading for the label
 };
 
 function bytes(n: number): string {
@@ -49,20 +50,23 @@ export default function UpdateModal({ onClose }: UpdateModalProps) {
   }, [st.stage]);
 
   const r = st.release;
+  const demo = st.stage === "demo";
   const busy =
     st.stage === "downloading" ||
     st.stage === "installing" ||
     st.stage === "restarting" ||
     st.stage === "downloaded";
   const showingProgress =
+    demo ||
     st.stage === "downloading" ||
     st.stage === "downloaded" ||
     st.stage === "installing" ||
     st.stage === "restarting";
 
-  // Kick off download→apply→restart as soon as a release is available.
+  // Kick off download→apply→restart as soon as a real release is available.
+  // (demo stage never triggers this — it's a fake, closeable preview.)
   useEffect(() => {
-    if (st.stage === "available" && r) {
+    if (st.stage === "available" && r && !demo) {
       runUpdate().catch(() => {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -103,7 +107,7 @@ export default function UpdateModal({ onClose }: UpdateModalProps) {
             </div>
             <div className="progress-meta">
               <span>{st.percent}%</span>
-              {st.stage === "downloading" && (
+              {(st.stage === "downloading" || demo) && (
                 <span className="muted">{bytes(st.downloaded)} / {bytes(st.total)}</span>
               )}
               {st.stage === "installing" && <span className="muted">Swapping binary…</span>}
@@ -126,6 +130,7 @@ export default function UpdateModal({ onClose }: UpdateModalProps) {
           {st.stage === "up-to-date" && (
             <button className="btn primary" onClick={onClose}>Done</button>
           )}
+          {demo && <span className="modal-hint">Demo preview — not a real update</span>}
           {busy && <span className="modal-hint">Please keep Ash open…</span>}
         </div>
       </div>

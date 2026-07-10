@@ -7,7 +7,17 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { app } from "../../wailsjs/go/models";
 
-export type UpdateStage = "idle" | "checking" | "available" | "downloading" | "downloaded" | "installing" | "restarting" | "error" | "up-to-date";
+export type UpdateStage =
+  | "idle"
+  | "checking"
+  | "available"
+  | "downloading"
+  | "downloaded"
+  | "installing"
+  | "restarting"
+  | "error"
+  | "up-to-date"
+  | "demo"; // dev-only: fake release + looping progress, no real download/install
 
 export interface UpdateState {
   stage: UpdateStage;
@@ -118,6 +128,56 @@ export async function runUpdate(): Promise<void> {
   } catch (err) {
     set({ stage: "error", error: String(err) });
   }
+}
+
+// ── Demo mode (dev only) ────────────────────────────────────────────────
+// A fake release + a progress bar that loops 0→100 forever, so the update
+// modal can be eyeballed/iterated without a real GitHub release or an actual
+// binary swap. Never calls invoke(); the modal stays open and closeable.
+// Gated to dev builds by the caller (App.tsx keybind) — not wired in release.
+let demoTimer: ReturnType<typeof setInterval> | null = null;
+
+const DEMO_RELEASE: UpdateReleaseInfo = {
+  hasUpdate: true,
+  latest: "1.2.0",
+  current: "1.0.0",
+  notes:
+    "## 1.2.0\n\n" +
+    "- New terminal opens in the user home, not the install dir\n" +
+    "- Ctrl+V / Ctrl+Shift+V now paste (Wispr Flow too)\n" +
+    "- Self-update via binary swap (no installer)\n" +
+    "- Frameless titlebar, ConPTY panes, agent engine\n\n" +
+    "This is a DEMO release body — not a real update.",
+  url: "https://github.com/xn0tdev/ash/releases/tag/v1.2.0",
+  downloadUrl: "",
+  downloadSize: 22_700_000,
+  assetName: "Ash.exe",
+};
+
+export function startDemo(): void {
+  if (demoTimer) return; // already running
+  let pct = 0;
+  set({
+    stage: "demo",
+    release: DEMO_RELEASE as unknown as app.UpdateRelease,
+    percent: 0,
+    downloaded: 0,
+    total: DEMO_RELEASE.downloadSize,
+    error: null,
+  });
+  demoTimer = setInterval(() => {
+    pct = (pct + 2) % 101; // 0..100, loops forever
+    const downloaded = Math.round((pct / 100) * DEMO_RELEASE.downloadSize);
+    set({ stage: "demo", percent: pct, downloaded, total: DEMO_RELEASE.downloadSize });
+  }, 120);
+}
+
+export function stopDemo(): void {
+  if (demoTimer) {
+    clearInterval(demoTimer);
+    demoTimer = null;
+  }
+  set({ stage: "idle", release: null, percent: 0, downloaded: 0, total: 0, error: null });
 }
 
 /** Auto-check on startup, quietly — the titlebar badge only shows if an

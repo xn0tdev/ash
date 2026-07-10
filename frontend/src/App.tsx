@@ -15,7 +15,7 @@ import UtilityModal from "./components/UtilityModal";
 import SshModal from "./components/SshModal";
 import RunModal from "./components/RunModal";
 import UpdateModal from "./components/UpdateModal";
-import { onUpdateState, startAutoCheck } from "./lib/updater";
+import { onUpdateState, startAutoCheck, startDemo, stopDemo } from "./lib/updater";
 import { AGENTS, AgentDef } from "./lib/agents";
 import { RunConfig, loadRuns, runCwd, saveRuns } from "./lib/runs";
 import { initPtyEvents, ptyKill } from "./lib/pty";
@@ -229,6 +229,9 @@ export default function App() {
   const [exOpen, setExOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [updateOpen, setUpdateOpen] = useState(false);
+  // Dev channel flag — gates the Ctrl+Shift+U demo keybind so the fake update
+  // modal never ships in a release build. Resolved once from AppInfo().channel.
+  const [isDevChannel, setIsDevChannel] = useState(true); // safe default = dev
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [explorerSide, setExplorerSide] = useState(
@@ -1225,11 +1228,32 @@ export default function App() {
 
   // Self-update: subscribe to the updater store (drives the titlebar badge)
   // and auto-check GitHub Releases once on startup (quietly, after a delay).
+  // Also resolve the build channel once so the dev-only demo keybind is gated
+  // out of release builds.
   useEffect(() => {
     const off = onUpdateState((s) => setUpdateAvailable(s.stage === "available"));
     startAutoCheck();
+    invoke<Record<string, string>>("app_info")
+      .then((info) => setIsDevChannel((info?.channel ?? "dev") !== "release"))
+      .catch(() => setIsDevChannel(true));
     return off;
   }, []);
+
+  // Dev-only: Ctrl+Shift+U opens the update modal as a looping DEMO (fake
+  // release + progress, no real download/install) so the modal can be
+  // eyeballed and iterated. Never active in a release build.
+  useEffect(() => {
+    if (!isDevChannel) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && (e.key === "u" || e.key === "U")) {
+        e.preventDefault();
+        startDemo();
+        setUpdateOpen(true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isDevChannel]);
 
   // Session events (shell ready, OSC title, PTY exit, link clicks) → state.
   useEffect(() => {
@@ -1550,7 +1574,14 @@ export default function App() {
         />
       )}
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
-      {updateOpen && <UpdateModal onClose={() => setUpdateOpen(false)} />}
+      {updateOpen && (
+        <UpdateModal
+          onClose={() => {
+            stopDemo(); // tear down any demo loop before closing
+            setUpdateOpen(false);
+          }}
+        />
+      )}
       {confirmClose && (
         <div className={`modal-backdrop${confirmClosing ? " closing" : ""}`} onMouseDown={() => closeConfirm()}>
           <div className={`confirm-modal${confirmClosing ? " closing" : ""}`} onMouseDown={(e) => e.stopPropagation()}>
