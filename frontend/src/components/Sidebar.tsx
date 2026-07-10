@@ -715,8 +715,8 @@ export default function Sidebar({
         ref={scrollRef}
       >
         <div className="side-header workspaces-header">
-          <span>Workspaces</span>
-          <span className="side-header-actions">
+          <span className="workspaces-head-left">
+            <span className="workspaces-title">Workspaces</span>
             <button
               className={`side-add workspaces-collapse${workspacesOpen ? "" : " closed"}`}
               title={workspacesOpen ? "Hide workspaces" : "Show workspaces"}
@@ -727,6 +727,8 @@ export default function Sidebar({
                 <polyline points="6 9 12 15 18 9" />
               </svg>
             </button>
+          </span>
+          <span className="side-header-actions">
             <button
               className="side-add"
               title="Close all terminals & chats"
@@ -777,16 +779,18 @@ export default function Sidebar({
           </>
         )}
 
-        {workspacesOpen && workspaces.map((ws) => {
-          const wsTabs = tabs.filter(
-            (t) => t.workspaceId === ws.id && !pinnedTabIds.has(t.id),
-          );
-          const shownTabs = wsTabs;
-          // An empty workspace (no terminals) can't be opened; keep it closed.
-          const isEmpty = wsTabs.length === 0;
-          const closed = collapsedWs.has(ws.id) || isEmpty;
-          return (
-            <div key={ws.id} className="ws-group">
+        <div className={`workspaces-list${workspacesOpen ? "" : " closed"}`}>
+          <div className="workspaces-list-inner">
+            {workspaces.map((ws) => {
+              const wsTabs = tabs.filter(
+                (t) => t.workspaceId === ws.id && !pinnedTabIds.has(t.id),
+              );
+              const shownTabs = wsTabs;
+              // An empty workspace (no terminals) can't be opened; keep it closed.
+              const isEmpty = wsTabs.length === 0;
+              const closed = collapsedWs.has(ws.id) || isEmpty;
+              return (
+                <div key={ws.id} className="ws-group">
               <div
                 className={`side-row ws-row${ws.id === activeWorkspaceId ? " current" : ""}${isEmpty ? " empty" : ""}${dropWs === ws.id ? " drop-target" : ""}`}
                 title={ws.path}
@@ -850,9 +854,11 @@ export default function Sidebar({
                   {shownTabs.map((t) => renderTab(t, true))}
                 </div>
               </div>
-            </div>
-          );
-        })}
+                </div>
+              );
+            })}
+          </div>
+        </div>
 
         {orphanSessions.length > 0 && (
           <div className="ws-group">
