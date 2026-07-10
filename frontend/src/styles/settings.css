@@ -185,6 +185,8 @@
 }
 
 .settings-search {
+  position: relative;
+  z-index: 2;
   height: 36px;
   display: flex;
   align-items: center;
@@ -192,8 +194,14 @@
   padding: 0 10px 0 12px;
   border-radius: 12px;
   corner-shape: squircle;
-  background: color-mix(in srgb, var(--raise) 72%, var(--surface));
+  background: color-mix(in srgb, var(--bg) 58%, var(--surface));
   color: var(--faint);
+  transition: border-radius 0.12s ease, background-color 0.1s ease;
+}
+
+.settings-search.open {
+  border-radius: 12px 12px 0 0;
+  background: color-mix(in srgb, var(--bg) 52%, var(--surface));
 }
 
 .settings-search:focus-within {
@@ -234,11 +242,11 @@
   position: absolute;
   left: 0;
   right: 0;
-  top: calc(100% + 8px);
-  padding: 6px;
-  border-radius: 14px;
+  top: 36px;
+  padding: 4px 6px 6px;
+  border-radius: 0 0 12px 12px;
   corner-shape: squircle;
-  background: color-mix(in srgb, var(--raise) 82%, var(--surface));
+  background: color-mix(in srgb, var(--bg) 52%, var(--surface));
   box-shadow: 0 18px 44px color-mix(in srgb, var(--shadow) 26%, transparent);
   animation: settingsSearchIn 0.14s ease;
 }

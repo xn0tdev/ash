@@ -572,7 +572,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
       <div className="settings-content" data-tauri-drag-region>
           <div className="settings-inner" data-tauri-drag-region>
             <div className="settings-search-wrap" data-tauri-drag-region>
-              <div className="settings-search">
+              <div className={`settings-search${searchQuery && searchActive ? " open" : ""}`}>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <circle cx="11" cy="11" r="7" />
                   <path d="m20 20-3.5-3.5" />
