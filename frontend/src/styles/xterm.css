@@ -6,12 +6,11 @@
   background-color: transparent !important;
 }
 
-/* xterm v6 draws its own VS Code-style overlay scrollbar — hide the
-   native viewport scrollbar so there's no fat bar / arrows. */
-.xterm .xterm-viewport::-webkit-scrollbar {
-  width: 0;
-  height: 0;
-}
+/* Keep the viewport's native scrollbar functional for wheel scrolling —
+   hiding it (width:0/display:none) broke wheel scroll in xterm v6 on
+   WebView2 (the viewport's overflow-y:scroll needs a real scrollbar to
+   route wheel events). xterm v6's own overlay scrollbar
+   (.xterm-scrollable-element) is styled below as the visible affordance. */
 
 /* thin, rounded overlay scrollbar; no arrow buttons */
 .xterm .xterm-scrollable-element > .scrollbar.vertical {

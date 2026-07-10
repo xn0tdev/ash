@@ -1,0 +1,10 @@
+{
+  "$schema": "https://randomlabs.ai/config.json",
+  "permission": {
+    "*": "allow",
+    "bash": "ask",
+    "edit": "ask",
+    "program.commit": "ask",
+    "program.execute": "ask"
+  }
+}
