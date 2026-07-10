@@ -11,8 +11,14 @@ export interface ModelInfo {
   id: string;
   /** Display name, e.g. "Claude Opus 4.5 (latest)". */
   name: string;
-  /** Provider id (drives the logo URL), e.g. "anthropic". */
+  /** Provider id (the reseller the model was found under, e.g. "302ai") — NOT
+   * the brand. Kept for reference but the logo uses `brand` (below), derived
+   * from the model's family, so GLM shows the Z.AI mark, Kimi shows Moonshot,
+   * etc. — not whichever reseller hosted the lookup hit. */
   provider: string;
+  /** Model family, e.g. "claude-opus", "glm", "kimi-k2", "minimax". Drives
+   * the brand logo (families map to their canonical brand provider). */
+  family: string;
   /** Context window in tokens (limit.context). */
   contextWindow: number;
   /** modalities.input includes "image". */
@@ -20,7 +26,7 @@ export interface ModelInfo {
 }
 
 const API = "https://models.dev/api.json";
-const CACHE_KEY = "ash.modelsDev";
+const CACHE_KEY = "ash.modelsDev.v2";
 const TTL_MS = 24 * 60 * 60 * 1000; // refetch at most once a day
 
 let catalog: ModelInfo[] | null = null;
@@ -37,6 +43,7 @@ function parse(json: Record<string, unknown>): ModelInfo[] {
       const m = raw as {
         id?: string;
         name?: string;
+        family?: string;
         attachment?: boolean;
         modalities?: { input?: unknown };
         limit?: { context?: unknown };
@@ -51,6 +58,7 @@ function parse(json: Record<string, unknown>): ModelInfo[] {
         id: String(m?.id ?? mid),
         name: String(m?.name ?? mid),
         provider,
+        family: String(m?.family ?? ""),
         contextWindow: ctx,
         supportsImages,
       });
@@ -119,9 +127,61 @@ export function providerLogo(provider: string): string {
   return `https://models.dev/logos/${provider}.svg`;
 }
 
-/** The stored logo, or a live one resolved from the loaded catalog. */
+// Family → canonical BRAND provider id. models.dev keys logos by provider, and
+// a model's `provider` field is whichever reseller hosted the lookup hit
+// (302ai, abacus, …) — so GLM would show a 302ai mark, Kimi some reseller's,
+// etc. Mapping the model's FAMILY to its brand owner gives each model its own
+// mark: GLM → Z.AI, Kimi → Moonshot, Minimax → MiniMax, Opus/Sonnet/Haiku →
+// Anthropic, GPT/Codex → OpenAI, Gemini → Google, Grok → xAI, Llama → Meta,
+// DeepSeek/Mistral → their own. Verified each brand id ships a real (non-
+// placeholder) SVG on models.dev. Families not in the map fall back to the
+// reseller provider logo (current behavior).
+const FAMILY_BRAND: { prefix: string; brand: string }[] = [
+  { prefix: "claude", brand: "anthropic" },
+  { prefix: "gpt-image", brand: "openai" },
+  { prefix: "gpt", brand: "openai" },
+  { prefix: "o", brand: "openai" }, // o1/o3/o4 family + "o", "o-mini", "o-pro"
+  { prefix: "codex", brand: "openai" },
+  { prefix: "gemini", brand: "google" },
+  { prefix: "imagen", brand: "google" },
+  { prefix: "grok", brand: "xai" },
+  { prefix: "llama", brand: "meta" },
+  { prefix: "deepseek", brand: "deepseek" },
+  { prefix: "mistral", brand: "mistral" },
+  { prefix: "mixtral", brand: "mistral" },
+  { prefix: "command", brand: "mistral" },
+  { prefix: "codestral", brand: "mistral" },
+  { prefix: "magistral", brand: "mistral" },
+  { prefix: "ministral", brand: "mistral" },
+  { prefix: "pixtral", brand: "mistral" },
+  { prefix: "devstral", brand: "mistral" },
+  { prefix: "kimi", brand: "moonshotai" },
+  { prefix: "glm", brand: "zai" },
+  { prefix: "minimax", brand: "minimax" },
+  { prefix: "qwen", brand: "alibaba" },
+];
+
+/** Brand provider id for a model family, or null if no mapping (caller falls
+ * back to the reseller provider). Matches `family === prefix` or a hyphenated
+ * child (e.g. "glm"/"glm-flash"), case-insensitively — a bare startsWith would
+ * wrongly bind unrelated families sharing a leading stem. */
+function brandOfFamily(family: string): string | null {
+  const f = family.trim().toLowerCase();
+  if (!f) return null;
+  for (const { prefix, brand } of FAMILY_BRAND) {
+    if (f === prefix || f.startsWith(prefix + "-")) return brand;
+  }
+  return null;
+}
+
+/** The stored logo, or a live one resolved from the loaded catalog — keyed
+ * off the model's FAMILY → its canonical brand, so the icon is the model's own
+ * mark (GLM→Z.AI, Kimi→Moonshot, Minimax→MiniMax, Claude→Anthropic, …) rather
+ * than whichever reseller provider hosted the lookup hit. */
 export function modelLogo(model: { modelId: string; logo?: string }): string | undefined {
   if (model.logo) return model.logo;
   const info = lookupModel(model.modelId);
-  return info ? providerLogo(info.provider) : undefined;
+  if (!info) return undefined;
+  const brand = brandOfFamily(info.family);
+  return brand ? providerLogo(brand) : providerLogo(info.provider);
 }
