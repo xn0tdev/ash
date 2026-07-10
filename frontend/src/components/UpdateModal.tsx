@@ -24,14 +24,41 @@ function bytes(n: number): string {
   return `${(n / 1024 / 1024).toFixed(1)} MB`;
 }
 
+const XGlyph = () => (
+  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+    <path d="M18 6 6 18M6 6l12 12" />
+  </svg>
+);
+
 export default function UpdateModal({ onClose }: UpdateModalProps) {
   const [st, setSt] = useState<UpdateState>(getUpdateState());
 
   useEffect(() => onUpdateState(setSt), []);
 
+  // Escape closes — unless we're mid-install (can't safely abort a swap).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        if (!busy) onClose();
+      }
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [st.stage]);
+
   const r = st.release;
-  const busy = st.stage === "downloading" || st.stage === "installing" || st.stage === "restarting" || st.stage === "downloaded";
-  const canInstall = st.stage === "available" && !!r;
+  const busy =
+    st.stage === "downloading" ||
+    st.stage === "installing" ||
+    st.stage === "restarting" ||
+    st.stage === "downloaded";
+  const showingProgress =
+    st.stage === "downloading" ||
+    st.stage === "downloaded" ||
+    st.stage === "installing" ||
+    st.stage === "restarting";
 
   // Kick off download→apply→restart as soon as a release is available.
   useEffect(() => {
@@ -44,29 +71,24 @@ export default function UpdateModal({ onClose }: UpdateModalProps) {
   return (
     <div className="modal-backdrop" onMouseDown={(e) => busy && e.preventDefault()}>
       <div className="modal update-modal" onMouseDown={(e) => e.stopPropagation()}>
-        <div className="update-head">
-          <div className="update-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 12a9 9 0 1 1-2.64-6.36" />
-              <path d="M21 3v6h-6" />
-            </svg>
-          </div>
-          <div className="update-titles">
-            <h3>{STAGE_LABEL[st.stage]}</h3>
-            {r && (
-              <div className="update-ver">
-                <span className="cur">{r.current}</span>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-                <span className="nxt">{r.latest}</span>
-              </div>
-            )}
-          </div>
-          {!busy && st.stage !== "installing" && (
-            <button className="modal-x" title="Close" onClick={onClose}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M5 5l14 14M19 5L5 19"/></svg>
+        <div className="modal-header">
+          <span>{STAGE_LABEL[st.stage]}</span>
+          {!busy && (
+            <button className="row-btn" title="Close" onClick={onClose}>
+              <XGlyph />
             </button>
           )}
         </div>
+
+        {r && (
+          <div className="update-version">
+            <span className="uv-cur">{r.current}</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 12h14M13 6l6 6-6 6" />
+            </svg>
+            <span className="uv-nxt">{r.latest}</span>
+          </div>
+        )}
 
         {r?.notes && (
           <div className="update-notes">
@@ -74,14 +96,16 @@ export default function UpdateModal({ onClose }: UpdateModalProps) {
           </div>
         )}
 
-        {(st.stage === "downloading" || st.stage === "downloaded" || st.stage === "installing" || st.stage === "restarting") && (
+        {showingProgress && (
           <div className="update-progress">
             <div className="progress-track">
               <div className="progress-fill" style={{ width: `${st.percent}%` }} />
             </div>
             <div className="progress-meta">
               <span>{st.percent}%</span>
-              {st.stage === "downloading" && <span className="muted">{bytes(st.downloaded)} / {bytes(st.total)}</span>}
+              {st.stage === "downloading" && (
+                <span className="muted">{bytes(st.downloaded)} / {bytes(st.total)}</span>
+              )}
               {st.stage === "installing" && <span className="muted">Swapping binary…</span>}
               {st.stage === "restarting" && <span className="muted">Relaunching Ash…</span>}
             </div>
@@ -89,26 +113,21 @@ export default function UpdateModal({ onClose }: UpdateModalProps) {
         )}
 
         {st.stage === "error" && (
-          <div className="update-error">
-            <p>{st.error ?? "Something went wrong."}</p>
-            <div className="update-actions">
-              <button className="btn-primary" onClick={() => runUpdate().catch(() => {})}>Retry</button>
-              <button className="btn-ghost" onClick={onClose}>Close</button>
-            </div>
-          </div>
+          <div className="update-error">{st.error ?? "Something went wrong."}</div>
         )}
 
-        {st.stage === "up-to-date" && (
-          <div className="update-actions">
-            <button className="btn-primary" onClick={onClose}>Done</button>
-          </div>
-        )}
-
-        {canInstall && (
-          <div className="update-actions">
-            <span className="muted">Starting download…</span>
-          </div>
-        )}
+        <div className="modal-actions">
+          {st.stage === "error" && (
+            <>
+              <button className="btn" onClick={onClose}>Close</button>
+              <button className="btn primary" onClick={() => runUpdate().catch(() => {})}>Retry</button>
+            </>
+          )}
+          {st.stage === "up-to-date" && (
+            <button className="btn primary" onClick={onClose}>Done</button>
+          )}
+          {busy && <span className="modal-hint">Please keep Ash open…</span>}
+        </div>
       </div>
     </div>
   );
