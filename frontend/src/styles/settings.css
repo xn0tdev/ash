@@ -202,6 +202,16 @@
 .settings-search.open {
   border-radius: 12px 12px 0 0;
   background: color-mix(in srgb, var(--bg) 52%, var(--surface));
+  animation: settingsSearchTriggerOpen 0.16s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes settingsSearchTriggerOpen {
+  from {
+    transform: translateY(1px);
+  }
+  to {
+    transform: translateY(0);
+  }
 }
 
 .settings-search:focus-within {
@@ -248,17 +258,24 @@
   corner-shape: squircle;
   background: color-mix(in srgb, var(--bg) 52%, var(--surface));
   box-shadow: 0 18px 44px color-mix(in srgb, var(--shadow) 26%, transparent);
-  animation: settingsSearchIn 0.14s ease;
+  transform-origin: top center;
+  overflow: hidden;
+  animation: settingsSearchDropdownIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-@keyframes settingsSearchIn {
+@keyframes settingsSearchDropdownIn {
   from {
     opacity: 0;
-    transform: translateY(-4px) scale(0.99);
+    clip-path: inset(0 0 100% 0 round 0 0 12px 12px);
+    transform: scaleY(0.92);
+  }
+  60% {
+    opacity: 1;
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    clip-path: inset(0 0 0 0 round 0 0 12px 12px);
+    transform: scaleY(1);
   }
 }
 
@@ -277,6 +294,17 @@
   color: var(--text);
   text-align: left;
   font: inherit;
+  opacity: 0;
+  transform: translateY(-4px);
+  animation: settingsSearchResultIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: calc(var(--i, 0) * 18ms + 35ms);
+}
+
+@keyframes settingsSearchResultIn {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .settings-search-result:hover,

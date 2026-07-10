@@ -613,7 +613,14 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                 <div className="settings-search-results">
                   {visibleSearchResults.length ? (
                     visibleSearchResults.map((item, i) => (
-                      <button key={`${item.cat}:${item.label}`} type="button" className={`settings-search-result${i === searchIndex ? " active" : ""}`} onMouseEnter={() => setSearchIndex(i)} onClick={() => jumpToSearchResult(item)}>
+                      <button
+                        key={`${item.cat}:${item.label}`}
+                        type="button"
+                        className={`settings-search-result${i === searchIndex ? " active" : ""}`}
+                        style={{ "--i": i } as React.CSSProperties}
+                        onMouseEnter={() => setSearchIndex(i)}
+                        onClick={() => jumpToSearchResult(item)}
+                      >
                         <span className="settings-search-result-main">
                           <span>{item.label}</span>
                           <small>{item.hint}</small>
