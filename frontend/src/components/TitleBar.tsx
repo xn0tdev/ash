@@ -60,7 +60,7 @@ export default function TitleBar({
 
   return (
     <header
-      className={`main-head${sidebarOpen ? " with-toggle" : ""}${showUpdateBadge ? " has-update" : ""}`}
+      className={`main-head${sidebarOpen ? "" : " with-toggle"}`}
       data-tauri-drag-region
     >
       {showUpdateBadge && (
