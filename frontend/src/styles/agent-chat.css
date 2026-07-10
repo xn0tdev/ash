@@ -539,12 +539,7 @@
 .chat-tool.s-in_progress {
   animation: chatShimmer 1.5s ease-in-out infinite;
 }
-.chat-tool.s-failed {
-  color: var(--text);
-}
-.chat-tool.s-failed .chat-tool-title {
-  color: inherit;
-}
+/* failed stays on --faint too — no white title; status is already clear from context */
 .tool-ico {
   flex-shrink: 0;
   /* icon and title share one muted tone (--faint) */

@@ -5,6 +5,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"syscall"
 )
@@ -30,7 +31,17 @@ func openConPTY(cwd string, cols, rows uint16, program string, args []string) (*
 		shell = p
 	}
 	cmd := exec.Command(shell, args...)
-	cmd.Dir = cwd
+	// Same default as Windows: never inherit the app launch dir; empty/bad cwd → home.
+	if cwd != "" {
+		if info, err := os.Stat(cwd); err == nil && info.IsDir() {
+			cmd.Dir = cwd
+		}
+	}
+	if cmd.Dir == "" {
+		if home, err := os.UserHomeDir(); err == nil {
+			cmd.Dir = home
+		}
+	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{}
 
 	in, err := cmd.StdinPipe()

@@ -5,6 +5,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 
 	"github.com/UserExistsError/conpty"
@@ -21,6 +22,21 @@ type ptyProc struct {
 func (p *ptyProc) Read(buf []byte) (int, error)  { return p.proc.Read(buf) }
 func (p *ptyProc) Write(b []byte) (int, error) { return p.proc.Write(b) }
 
+// resolveWorkDir mirrors Ash's pty_spawn: a real directory wins, otherwise
+// fall back to the user's home. Never inherit the app's launch dir (e.g.
+// C:\Program Files\Ash) — New Terminal should open in ~, not the install folder.
+func resolveWorkDir(cwd string) string {
+	if cwd != "" {
+		if info, err := os.Stat(cwd); err == nil && info.IsDir() {
+			return cwd
+		}
+	}
+	if home, err := os.UserHomeDir(); err == nil && home != "" {
+		return home
+	}
+	return cwd
+}
+
 func openConPTY(cwd string, cols, rows uint16, program string, args []string) (*ptyProc, error) {
 	// Caller-supplied program wins (agent may spawn a specific shell); else
 	// auto-detect pwsh/powershell/cmd (matches Ash's Windows-shell assumption).
@@ -34,11 +50,14 @@ func openConPTY(cwd string, cols, rows uint16, program string, args []string) (*
 		shell := findShell()
 		cmdLine = "\"" + shell[0] + "\""
 	}
-	c, err := conpty.Start(
-		cmdLine,
+	workDir := resolveWorkDir(cwd)
+	opts := []conpty.ConPtyOption{
 		conpty.ConPtyDimensions(int(cols), int(rows)),
-		conpty.ConPtyWorkDir(cwd),
-	)
+	}
+	if workDir != "" {
+		opts = append(opts, conpty.ConPtyWorkDir(workDir))
+	}
+	c, err := conpty.Start(cmdLine, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("conpty start: %w", err)
 	}

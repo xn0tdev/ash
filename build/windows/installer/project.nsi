@@ -19,14 +19,15 @@ Unicode true
 ####
 ## The following information is taken from the ProjectInfo file, but they can be overwritten here.
 ####
-## !define INFO_PROJECTNAME    "MyProject" # Default "{{.Name}}"
-## !define INFO_COMPANYNAME    "MyCompany" # Default "{{.Info.CompanyName}}"
-## !define INFO_PRODUCTNAME    "MyProduct" # Default "{{.Info.ProductName}}"
+!define INFO_PROJECTNAME    "Ash" # Default "{{.Name}}"
+!define INFO_COMPANYNAME    "Ash" # Default "{{.Info.CompanyName}}"
+!define INFO_PRODUCTNAME    "Ash" # Default "{{.Info.ProductName}}"
 ## !define INFO_PRODUCTVERSION "1.0.0"     # Default "{{.Info.ProductVersion}}"
 ## !define INFO_COPYRIGHT      "Copyright" # Default "{{.Info.Copyright}}"
 ###
-## !define PRODUCT_EXECUTABLE  "Application.exe"      # Default "${INFO_PROJECTNAME}.exe"
-## !define UNINST_KEY_NAME     "UninstKeyInRegistry"  # Default "${INFO_COMPANYNAME}${INFO_PRODUCTNAME}"
+!define PRODUCT_EXECUTABLE  "Ash.exe"      # Default "${INFO_PROJECTNAME}.exe"
+# Single key "Ash" — NOT "AshAsh" from company+product concat.
+!define UNINST_KEY_NAME     "Ash"
 ####
 ## !define REQUEST_EXECUTION_LEVEL "admin"            # Default "admin"  see also https://nsis.sourceforge.io/Docs/Chapter4.html
 ####
@@ -76,10 +77,11 @@ OutFile "..\..\bin\${INFO_PROJECTNAME}-${ARCH}-installer.exe" # Name of the inst
   !if "${WAILS_INSTALL_SCOPE}" == "user"
     InstallDir "$LOCALAPPDATA\Programs\${INFO_PRODUCTNAME}"
   !else
-    InstallDir "$PROGRAMFILES64\${INFO_COMPANYNAME}\${INFO_PRODUCTNAME}"
+    # Flat: C:\Program Files\Ash  — NOT Ash\Ash (company+product nesting).
+    InstallDir "$PROGRAMFILES64\${INFO_PRODUCTNAME}"
   !endif
 !else
-  InstallDir "$PROGRAMFILES64\${INFO_COMPANYNAME}\${INFO_PRODUCTNAME}"
+  InstallDir "$PROGRAMFILES64\${INFO_PRODUCTNAME}"
 !endif # Default installing folder ($PROGRAMFILES is Program Files folder).
 ShowInstDetails show # This will always show the installation details.
 
@@ -91,6 +93,15 @@ Section
     !insertmacro wails.setShellContext
 
     !insertmacro wails.webview2runtime
+
+    # Flat install is C:\Program Files\Ash. Wipe any previous tree first
+    # (old nested ash\ash / Ash\Ash — same path on case-insensitive NTFS).
+    RMDir /r "$PROGRAMFILES64\Ash"
+    Delete "$SMPROGRAMS\ash.lnk"
+    Delete "$DESKTOP\ash.lnk"
+    SetRegView 64
+    DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ashash"
+    DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\AshAsh"
 
     SetOutPath $INSTDIR
 
@@ -114,6 +125,9 @@ Section "uninstall"
 
     Delete "$SMPROGRAMS\${INFO_PRODUCTNAME}.lnk"
     Delete "$DESKTOP\${INFO_PRODUCTNAME}.lnk"
+    # Also clean any leftover lowercase shortcuts from older builds.
+    Delete "$SMPROGRAMS\ash.lnk"
+    Delete "$DESKTOP\ash.lnk"
 
     !insertmacro wails.unassociateFiles
     !insertmacro wails.unassociateCustomProtocols

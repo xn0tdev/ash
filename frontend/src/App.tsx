@@ -642,9 +642,11 @@ export default function App() {
 
   // "New tab" always opens outside any workspace — drag it onto a workspace
   // in the sidebar to move it in, or use that workspace's own "+" instead.
-  const addTab = useCallback(() => {
+  // cwd = home so the shell starts in the user profile, not the app install dir.
+  const addTab = useCallback(async () => {
     const tab = makeTab("shell", false, null);
-    setSpawnOptions(firstLeaf(tab.root), {});
+    const home = await homeDir().catch(() => "");
+    setSpawnOptions(firstLeaf(tab.root), { cwd: home || null });
     setTabs((t) => [...t, tab]);
     setActiveTabId(tab.id);
   }, []);

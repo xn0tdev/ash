@@ -6,16 +6,6 @@
   z-index: 100;
   display: flex;
   background: var(--bg);
-  animation: settingsPageIn 0.18s ease;
-}
-
-@keyframes settingsPageIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
 }
 
 .settings-nav {
