@@ -268,13 +268,13 @@ const ABOUT_ICON = () => (
 );
 
 const CATEGORIES = [
-  { id: "appearance", label: "Appearance", icon: APPEARANCE_ICON },
-  { id: "layout", label: "Layout", icon: LAYOUT_ICON },
-  { id: "sections", label: "Sidebar sections", icon: SECTIONS_ICON },
-  { id: "terminal", label: "Terminal", icon: TERMINAL_ICON },
-  { id: "agents", label: "Agents", icon: AGENTS_ICON },
-  { id: "shortcuts", label: "Shortcuts", icon: SHORTCUTS_ICON },
-  { id: "about", label: "About", icon: ABOUT_ICON },
+  { id: "appearance", label: "Appearance" },
+  { id: "layout", label: "Layout" },
+  { id: "sections", label: "Sidebar sections" },
+  { id: "terminal", label: "Terminal" },
+  { id: "agents", label: "Agents" },
+  { id: "shortcuts", label: "Shortcuts" },
+  { id: "about", label: "About" },
 ] as const;
 
 type CategoryId = (typeof CATEGORIES)[number]["id"];
@@ -677,21 +677,15 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
           )}
         </div>
         <div className="settings-cats">
-          {CATEGORIES.map((c) => {
-            const Icon = c.icon;
-            return (
-              <button
-                key={c.id}
-                className={`nav-item${cat === c.id ? " active" : ""}`}
-                onClick={() => setCat(c.id)}
-              >
-                <span className="nav-item-icon">
-                  <Icon />
-                </span>
-                {c.label}
-              </button>
-            );
-          })}
+          {CATEGORIES.map((c) => (
+            <button
+              key={c.id}
+              className={`nav-item${cat === c.id ? " active" : ""}`}
+              onClick={() => setCat(c.id)}
+            >
+              {c.label}
+            </button>
+          ))}
         </div>
       </nav>
 
