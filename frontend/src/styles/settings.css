@@ -251,8 +251,7 @@
   corner-shape: squircle;
   background: var(--raise);
   box-shadow:
-    0 12px 30px rgba(0, 0, 0, 0.5),
-    0 0 0 1px rgba(255, 255, 255, 0.07);
+    0 12px 30px rgba(0, 0, 0, 0.5);
   transform-origin: top center;
   display: flex;
   flex-direction: column;
@@ -301,18 +300,11 @@
   color: var(--text);
   text-align: left;
   font: inherit;
-  opacity: 0;
-  transform: translateY(-3px);
-  animation: settingsSearchResultIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  animation-delay: calc(var(--i, 0) * 22ms + 60ms);
 }
 
-@keyframes settingsSearchResultIn {
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
+/* unused — results no longer stagger in; the container's clip-path grow
+   carries the reveal */
+/* @keyframes settingsSearchResultIn removed */
 
 .settings-search-result:hover,
 .settings-search-result.active {
@@ -351,8 +343,8 @@
 }
 
 .settings-search-empty {
-  padding: 16px 10px;
-  color: var(--muted);
+  padding: 12px 10px;
+  color: var(--faint);
   font-size: 12px;
   text-align: center;
 }
