@@ -58,15 +58,18 @@
   width: 28px;
   height: 28px;
   border: none;
+  border-radius: 8px;
   background: transparent;
-  color: var(--muted);
+  /* dim by default, bright to white only on hover — reads as quiet chrome
+     until you reach for it (Apple-style restraint, not always-lit buttons). */
+  color: var(--faint);
   cursor: default;
   transition: background-color 0.1s ease, color 0.1s ease;
 }
 
 .wc-btn:hover {
   background: var(--hover);
-  color: var(--text);
+  color: #fff;
 }
 
 .wc-close:hover {
