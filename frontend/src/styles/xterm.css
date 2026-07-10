@@ -7,10 +7,35 @@
 }
 
 /* Keep the viewport's native scrollbar functional for wheel scrolling —
-   hiding it (width:0/display:none) broke wheel scroll in xterm v6 on
-   WebView2 (the viewport's overflow-y:scroll needs a real scrollbar to
-   route wheel events). xterm v6's own overlay scrollbar
-   (.xterm-scrollable-element) is styled below as the visible affordance. */
+   hiding the WHOLE scrollbar (width:0/display:none) broke wheel scroll in
+   xterm v6 on WebView2. We only remove the Windows scrollbar arrow buttons
+   (the little square with a down chevron in the bottom-right corner). */
+.xterm .xterm-viewport::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.xterm .xterm-viewport::-webkit-scrollbar-button,
+.xterm .xterm-viewport::-webkit-scrollbar-button:single-button,
+.xterm .xterm-viewport::-webkit-scrollbar-button:vertical:start,
+.xterm .xterm-viewport::-webkit-scrollbar-button:vertical:end,
+.xterm .xterm-viewport::-webkit-scrollbar-corner {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  background: transparent !important;
+}
+.xterm .xterm-viewport::-webkit-scrollbar-track {
+  background: transparent;
+}
+.xterm .xterm-viewport::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 18%, transparent);
+}
+.xterm .xterm-viewport::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--text) 28%, transparent);
+}
 
 /* thin, rounded overlay scrollbar; no arrow buttons */
 .xterm .xterm-scrollable-element > .scrollbar.vertical {
