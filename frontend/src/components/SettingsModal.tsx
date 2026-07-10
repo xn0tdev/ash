@@ -212,6 +212,7 @@ import {
   Settings,
   SectionToggles,
   CONTEXT_STOPS,
+  DEFAULT_SETTINGS,
   EngineModel,
   EngineProvider,
 } from "../lib/settings";
@@ -234,6 +235,30 @@ const CATEGORIES = [
 ] as const;
 
 type CategoryId = (typeof CATEGORIES)[number]["id"];
+
+function RestoreButton({
+  show,
+  onClick,
+}: {
+  show: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={`setting-restore${show ? " show" : ""}`}
+      title="Restore default"
+      aria-label="Restore default"
+      disabled={!show}
+      onClick={onClick}
+    >
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 12a9 9 0 1 0 3-6.7" />
+        <path d="M3 4v6h6" />
+      </svg>
+    </button>
+  );
+}
 
 function Toggle({
   checked,
@@ -500,11 +525,17 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                       Colors for the whole app and terminal
                     </span>
                   </div>
-                  <Select
-                    value={settings.theme}
-                    onChange={(v) => apply({ theme: v })}
-                    options={THEMES.map((t) => ({ value: t.id, label: t.label }))}
-                  />
+                  <div className="setting-control">
+                    <Select
+                      value={settings.theme}
+                      onChange={(v) => apply({ theme: v })}
+                      options={THEMES.map((t) => ({ value: t.id, label: t.label }))}
+                    />
+                    <RestoreButton
+                      show={settings.theme !== DEFAULT_SETTINGS.theme}
+                      onClick={() => apply({ theme: DEFAULT_SETTINGS.theme })}
+                    />
+                  </div>
                 </div>
                 <div className="setting-row">
                   <div className="setting-info">
@@ -513,10 +544,16 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                       Use the theme's white variant (works with every theme)
                     </span>
                   </div>
-                  <Toggle
-                    checked={settings.themeLight}
-                    onChange={(v) => apply({ themeLight: v })}
-                  />
+                  <div className="setting-control">
+                    <Toggle
+                      checked={settings.themeLight}
+                      onChange={(v) => apply({ themeLight: v })}
+                    />
+                    <RestoreButton
+                      show={settings.themeLight !== DEFAULT_SETTINGS.themeLight}
+                      onClick={() => apply({ themeLight: DEFAULT_SETTINGS.themeLight })}
+                    />
+                  </div>
                 </div>
                 <div className="setting-row">
                   <div className="setting-info">
@@ -525,18 +562,24 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                       Zoom the whole UI (sidebar, tabs, chat, panels)
                     </span>
                   </div>
-                  <Select
-                    value={String(settings.uiScale)}
-                    onChange={(v) => apply({ uiScale: Number(v) })}
-                    options={[
-                      { value: "0.8", label: "80%" },
-                      { value: "0.85", label: "85%" },
-                      { value: "0.9", label: "90%" },
-                      { value: "0.95", label: "95%" },
-                      { value: "1", label: "100%" },
-                      { value: "1.1", label: "110%" },
-                    ]}
-                  />
+                  <div className="setting-control">
+                    <Select
+                      value={String(settings.uiScale)}
+                      onChange={(v) => apply({ uiScale: Number(v) })}
+                      options={[
+                        { value: "0.8", label: "80%" },
+                        { value: "0.85", label: "85%" },
+                        { value: "0.9", label: "90%" },
+                        { value: "0.95", label: "95%" },
+                        { value: "1", label: "100%" },
+                        { value: "1.1", label: "110%" },
+                      ]}
+                    />
+                    <RestoreButton
+                      show={settings.uiScale !== DEFAULT_SETTINGS.uiScale}
+                      onClick={() => apply({ uiScale: DEFAULT_SETTINGS.uiScale })}
+                    />
+                  </div>
                 </div>
                 <div className="setting-row">
                   <div className="setting-info">
@@ -545,23 +588,35 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                       Geist Mono and JetBrains Mono are bundled
                     </span>
                   </div>
-                  <Select
-                    value={settings.font}
-                    onChange={(v) => apply({ font: v })}
-                    options={FONTS.map((f) => ({ value: f.id, label: f.label }))}
-                  />
+                  <div className="setting-control">
+                    <Select
+                      value={settings.font}
+                      onChange={(v) => apply({ font: v })}
+                      options={FONTS.map((f) => ({ value: f.id, label: f.label }))}
+                    />
+                    <RestoreButton
+                      show={settings.font !== DEFAULT_SETTINGS.font}
+                      onClick={() => apply({ font: DEFAULT_SETTINGS.font })}
+                    />
+                  </div>
                 </div>
                 <div className="setting-row">
                   <div className="setting-info">
                     <label>Font size</label>
                     <span className="setting-hint">Ctrl+= / Ctrl+- / Ctrl+0</span>
                   </div>
-                  <Stepper
-                    value={settings.fontSize}
-                    min={9}
-                    max={24}
-                    onChange={(v) => apply({ fontSize: v })}
-                  />
+                  <div className="setting-control">
+                    <Stepper
+                      value={settings.fontSize}
+                      min={9}
+                      max={24}
+                      onChange={(v) => apply({ fontSize: v })}
+                    />
+                    <RestoreButton
+                      show={settings.fontSize !== DEFAULT_SETTINGS.fontSize}
+                      onClick={() => apply({ fontSize: DEFAULT_SETTINGS.fontSize })}
+                    />
+                  </div>
                 </div>
               </section>
             )}
@@ -640,24 +695,36 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                       Space between the app surface and the terminal grid
                     </span>
                   </div>
-                  <Stepper
-                    value={settings.termPad}
-                    min={0}
-                    max={32}
-                    onChange={(v) => apply({ termPad: v })}
-                  />
+                  <div className="setting-control">
+                    <Stepper
+                      value={settings.termPad}
+                      min={0}
+                      max={32}
+                      onChange={(v) => apply({ termPad: v })}
+                    />
+                    <RestoreButton
+                      show={settings.termPad !== DEFAULT_SETTINGS.termPad}
+                      onClick={() => apply({ termPad: DEFAULT_SETTINGS.termPad })}
+                    />
+                  </div>
                 </div>
                 <div className="setting-row">
                   <div className="setting-info">
                     <label>Corner radius</label>
                     <span className="setting-hint">Rounding of the terminal pane corners</span>
                   </div>
-                  <Stepper
-                    value={settings.termRadius}
-                    min={0}
-                    max={36}
-                    onChange={(v) => apply({ termRadius: v })}
-                  />
+                  <div className="setting-control">
+                    <Stepper
+                      value={settings.termRadius}
+                      min={0}
+                      max={36}
+                      onChange={(v) => apply({ termRadius: v })}
+                    />
+                    <RestoreButton
+                      show={settings.termRadius !== DEFAULT_SETTINGS.termRadius}
+                      onClick={() => apply({ termRadius: DEFAULT_SETTINGS.termRadius })}
+                    />
+                  </div>
                 </div>
                 <div className="setting-row">
                   <div className="setting-info">
@@ -667,16 +734,22 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                       terminals are session-only
                     </span>
                   </div>
-                  <Select
-                    value={settings.clearOnExit}
-                    onChange={(v) => apply({ clearOnExit: v as Settings["clearOnExit"] })}
-                    options={[
-                      { value: "none", label: "Keep everything" },
-                      { value: "chats", label: "Chats" },
-                      { value: "terminals", label: "Terminals" },
-                      { value: "all", label: "Chats + terminals" },
-                    ]}
-                  />
+                  <div className="setting-control">
+                    <Select
+                      value={settings.clearOnExit}
+                      onChange={(v) => apply({ clearOnExit: v as Settings["clearOnExit"] })}
+                      options={[
+                        { value: "none", label: "Keep everything" },
+                        { value: "chats", label: "Chats" },
+                        { value: "terminals", label: "Terminals" },
+                        { value: "all", label: "Chats + terminals" },
+                      ]}
+                    />
+                    <RestoreButton
+                      show={settings.clearOnExit !== DEFAULT_SETTINGS.clearOnExit}
+                      onClick={() => apply({ clearOnExit: DEFAULT_SETTINGS.clearOnExit })}
+                    />
+                  </div>
                 </div>
               </section>
             )}

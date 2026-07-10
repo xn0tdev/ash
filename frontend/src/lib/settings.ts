@@ -113,7 +113,7 @@ export interface Settings {
 
 export const DEFAULT_FONT_SIZE = 13;
 
-const DEFAULTS: Settings = {
+export const DEFAULT_SETTINGS: Settings = {
   theme: "vercel-dark",
   themeLight: false,
   font: "geist-mono",
@@ -206,7 +206,7 @@ export function applyUiScale() {
 // localStorage blob. Loaded once at startup into `current`; the read API stays
 // synchronous, writes are async fire-and-forget.
 const LEGACY_KEY = "spark.settings";
-let current: Settings = { ...DEFAULTS };
+let current: Settings = { ...DEFAULT_SETTINGS };
 let settingsPath: string | null = null;
 
 function normalizeReasoning(v: any): ReasoningEffort {
@@ -240,7 +240,7 @@ function normalizeProviders(arr: any[]): EngineProvider[] {
 }
 
 function defaultProviders(): EngineProvider[] {
-  return DEFAULTS.engine.providers.map((p) => ({ ...p, models: p.models.map((m) => ({ ...m })) }));
+  return DEFAULT_SETTINGS.engine.providers.map((p) => ({ ...p, models: p.models.map((m) => ({ ...m })) }));
 }
 
 /** Fold a parsed `engine` blob (which may be the new multi-provider shape OR a
@@ -248,7 +248,7 @@ function defaultProviders(): EngineProvider[] {
  * migrated into one provider so the user keeps their old key + models. */
 function mergeEngine(parsedEngine: any): EngineSettings {
   const common: EngineSettings = {
-    ...DEFAULTS.engine,
+    ...DEFAULT_SETTINGS.engine,
     useFast: parsedEngine?.useFast ?? false,
     permissionMode: parsedEngine?.permissionMode === "full-auto" ? "full-auto" : "confirm",
     safeMode: !!parsedEngine?.safeMode,
@@ -261,7 +261,7 @@ function mergeEngine(parsedEngine: any): EngineSettings {
   if (parsedEngine && Array.isArray(parsedEngine.providers)) {
     const providers = normalizeProviders(parsedEngine.providers);
     if (providers.length === 0)
-      return { ...common, providers: defaultProviders(), activeProviderId: DEFAULTS.engine.activeProviderId, activeModelId: DEFAULTS.engine.activeModelId };
+      return { ...common, providers: defaultProviders(), activeProviderId: DEFAULT_SETTINGS.engine.activeProviderId, activeModelId: DEFAULT_SETTINGS.engine.activeModelId };
     const activeProviderId = providers.some((p) => p.id === parsedEngine.activeProviderId)
       ? parsedEngine.activeProviderId
       : providers[0].id;
@@ -277,9 +277,9 @@ function mergeEngine(parsedEngine: any): EngineSettings {
   // on it), so it's dropped here rather than carried as dead state.
   const old = parsedEngine ?? {};
   if (!old.openaiCompat && !Array.isArray(old.models))
-    return { ...common, providers: defaultProviders(), activeProviderId: DEFAULTS.engine.activeProviderId, activeModelId: DEFAULTS.engine.activeModelId };
+    return { ...common, providers: defaultProviders(), activeProviderId: DEFAULT_SETTINGS.engine.activeProviderId, activeModelId: DEFAULT_SETTINGS.engine.activeModelId };
 
-  const baseUrl = String(old.openaiCompat?.baseUrl ?? DEFAULTS.engine.providers[0].baseUrl);
+  const baseUrl = String(old.openaiCompat?.baseUrl ?? DEFAULT_SETTINGS.engine.providers[0].baseUrl);
   const apiKey = String(old.openaiCompat?.apiKey ?? "");
   const models: EngineModel[] = Array.isArray(old.models) && old.models.length
     ? normalizeModels(old.models)
@@ -303,14 +303,14 @@ function mergeEngine(parsedEngine: any): EngineSettings {
 
 function mergeParsed(parsed: any): Settings {
   const merged: Settings = {
-    ...DEFAULTS,
+    ...DEFAULT_SETTINGS,
     ...parsed,
-    sections: { ...DEFAULTS.sections, ...(parsed.sections ?? {}) },
+    sections: { ...DEFAULT_SETTINGS.sections, ...(parsed.sections ?? {}) },
     engine: mergeEngine(parsed?.engine),
   };
   // migrate older defaults to the current, slimmer one
   if (merged.sidebarWidth === 168 || merged.sidebarWidth === 216)
-    merged.sidebarWidth = DEFAULTS.sidebarWidth;
+    merged.sidebarWidth = DEFAULT_SETTINGS.sidebarWidth;
   // removed themes follow their replacement
   if (
     merged.theme === "catppuccin-mocha" ||

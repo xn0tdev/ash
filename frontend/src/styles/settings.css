@@ -179,6 +179,45 @@
   padding: 18px 0;
 }
 
+.setting-control {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 248px;
+}
+
+.setting-restore {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 8px;
+  corner-shape: squircle;
+  background: transparent;
+  color: var(--faint);
+  opacity: 0;
+  transform: scale(0.92);
+  pointer-events: none;
+  transition: opacity 0.12s ease, transform 0.12s ease, background-color 0.1s ease, color 0.1s ease;
+}
+
+.setting-restore.show {
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: auto;
+}
+
+.setting-restore.show:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.setting-restore.show:active {
+  transform: scale(0.96);
+}
+
 /* No inter-row hairlines: rows are already distinguished by label/control
    structure and the section <h3> anchors each group. A 1px rule under every
    row read as clutter on top of the card-style provider/model blocks below —
