@@ -1431,24 +1431,23 @@ export default function App() {
           <rect className="tgl-outline" x="6" y="8" width="4.5" height="8" rx="2" />
         </svg>
       </button>
-      {/* Self-update pill — sits immediately AFTER the sidebar toggle icon
-          (same top strip). Absolute on .app so it never shifts the title. */}
-      {updateAvailable && (
-        <button
-          type="button"
-          className="update-badge"
-          title="A new version of Ash is available"
-          onClick={() => setUpdateOpen(true)}
-        >
-          Update
-        </button>
-      )}
       <div
         className={`rail${collapsed ? " collapsed" : ""}`}
         style={{ width: collapsed ? 0 : sidebarWidth }}
       >
         <div className="rail-top" data-tauri-drag-region>
           <div className="rail-brand" data-tauri-drag-region />
+          {/* Same Y as the sidebar toggle (rail-top strip); X = end of sidebar. */}
+          {updateAvailable && (
+            <button
+              type="button"
+              className="update-badge"
+              title="A new version of Ash is available"
+              onClick={() => setUpdateOpen(true)}
+            >
+              Update
+            </button>
+          )}
         </div>
         <Sidebar
           tabs={tabs}

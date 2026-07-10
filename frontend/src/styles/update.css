@@ -1,15 +1,11 @@
 /* Update button — blue filled capsule, white "Update" text.
-   Sits immediately AFTER the sidebar toggle (.app-toggle) in the top-left
-   strip (the red-cube zone). Absolute on .app (position:relative) so the
-   titlebar title never moves. */
+   Same Y as the sidebar toggle (lives in .rail-top, height 42px, vertically
+   centered). X = end of the sidebar (margin-left: auto in the rail-top flex).
+   Never touches the titlebar title. */
 
-.update-badge {
-  position: absolute;
-  /* Vertically align with the 28px toggle at top:8 → (28-24)/2 + 8 = 10 */
-  top: 10px;
-  /* Toggle is left:8 width:28 → sit 6px after it */
-  left: 42px;
-  z-index: 50;
+.rail-top .update-badge {
+  flex-shrink: 0;
+  margin-left: auto; /* push to the right end of the sidebar strip */
   height: 24px;
   padding: 0 12px;
   border: none;
@@ -22,17 +18,14 @@
   /* hover: background only — no filter on the type */
   transition: background-color 0.12s ease;
   user-select: none;
+  /* don't start a window-drag from the button */
+  --wails-draggable: no-drag;
 }
-.update-badge:hover {
+.rail-top .update-badge:hover {
   background: #1d4ed8;
 }
-.update-badge:active {
+.rail-top .update-badge:active {
   background: #1e40af;
-}
-
-/* macOS: toggle is shifted right for traffic lights */
-.mac .update-badge {
-  left: 112px; /* toggle at 78 + 28 + 6 */
 }
 
 /* ── Update modal ─────────────────────────────────────────
