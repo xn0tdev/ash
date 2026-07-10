@@ -44,4 +44,8 @@ body,
 #root {
   height: 100%;
   background: var(--bg);
+  /* Desktop app — the window itself never scrolls as a page; only inner
+     surfaces (the terminal viewport) scroll. Without this the titlebar rode
+     along with the terminal scroll. */
+  overflow: hidden;
 }
