@@ -14,8 +14,6 @@ interface TitleBarProps {
   workspaceName: string | null;
   branch: string | null;
   sidebarOpen: boolean;
-  showUpdateBadge: boolean;
-  onUpdate: () => void;
 }
 
 export default function TitleBar({
@@ -23,8 +21,6 @@ export default function TitleBar({
   workspaceName,
   branch,
   sidebarOpen,
-  showUpdateBadge,
-  onUpdate,
 }: TitleBarProps) {
   const [maximized, setMaximized] = useState(false);
 
@@ -63,18 +59,6 @@ export default function TitleBar({
       className={`main-head${sidebarOpen ? "" : " with-toggle"}`}
       data-tauri-drag-region
     >
-      {/* Absolute — out of the flex flow so the title keeps its natural left
-          position. Only rendered when an update is available. */}
-      {showUpdateBadge && (
-        <button
-          type="button"
-          className="update-badge"
-          title="A new version of Ash is available"
-          onClick={onUpdate}
-        >
-          Update
-        </button>
-      )}
       <span className="head-title" data-tauri-drag-region>
         {title}
       </span>

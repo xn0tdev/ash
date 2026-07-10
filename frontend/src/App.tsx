@@ -1476,6 +1476,8 @@ export default function App() {
           onOpenSearch={() => setPaletteOpen(true)}
           onCloseAll={() => setConfirmCloseAll(true)}
           onOpenSettings={() => setSettingsOpen(true)}
+          showUpdateBadge={updateAvailable}
+          onUpdate={() => setUpdateOpen(true)}
         />
       </div>
       {!collapsed && (
@@ -1487,8 +1489,6 @@ export default function App() {
           workspaceName={activeTabWs?.name ?? null}
           branch={activeTabWs ? branch : null}
           sidebarOpen={!collapsed}
-          showUpdateBadge={updateAvailable}
-          onUpdate={() => setUpdateOpen(true)}
         />
         <div className="main-body">
           {explorerSide === "left" && explorer}
