@@ -250,7 +250,7 @@
 .chat-user-text {
   display: block;
   padding: 10px 12px;
-  border-radius: 12px;
+  border-radius: 16px;
   corner-shape: squircle;
   background: color-mix(in srgb, var(--raise) 72%, var(--surface));
   color: color-mix(in srgb, var(--text) 88%, var(--muted));
