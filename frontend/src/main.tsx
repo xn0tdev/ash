@@ -3,7 +3,7 @@ import App from "./App";
 import ErrorBoundary from "./ErrorBoundary";
 import { applyAppTheme, applyUiScale, getSettings, loadSettings } from "./lib/settings";
 import { loadChats } from "./lib/chat-store";
-import { loadModelsDev } from "./lib/models-dev";
+import { loadModelsDev, brandForModelId, providerLogo, prefetchLogos } from "./lib/models-dev";
 
 // UI font (app chrome). Geist Mono / JetBrains Mono below stay for the terminal.
 import "@fontsource/inter/400.css";
@@ -118,10 +118,26 @@ async function start() {
   // font loading can begin immediately, overlapping the disk reads.
   const settingsReady = loadSettings();
   const chatsReady = loadChats().catch(() => {});
-  // Preload the models.dev catalog alongside the disk reads so provider logos
-  // are resolved by the time an agent pane opens — without this the model
-  // picker's icons appeared a beat late and popped in.
-  const modelsReady = loadModelsDev().catch(() => {});
+  // Preload the models.dev catalog alongside the disk reads so brand logos
+  // are resolved by the time an agent pane opens. Once the catalog is in,
+  // prefetch the SVG for every configured model's brand into the HTTP cache so
+  // the picker's <img> paints on the first frame — without this the icons
+  // flashed in a millisecond late (catalog fetch + per-icon SVG fetch stacked).
+  const modelsReady = loadModelsDev()
+    .then(() => {
+      const eng = getSettings().engine;
+      const urls = new Set<string>();
+      for (const p of eng.providers)
+        for (const m of p.models) {
+          if (m.logo) urls.add(m.logo);
+          else {
+            const brand = brandForModelId(m.modelId);
+            if (brand) urls.add(providerLogo(brand));
+          }
+        }
+      prefetchLogos(urls);
+    })
+    .catch(() => {});
   // Terminals measure cell size at creation — the mono font must be in first.
   // Load a Cyrillic sample too so that subset is ready before any RU text.
   // Preload EVERY selectable terminal mono face (not just the default) so that
