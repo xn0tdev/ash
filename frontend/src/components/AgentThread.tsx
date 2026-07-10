@@ -297,12 +297,12 @@ const ItemRow = memo(function ItemRow({
           )}
           {item.text &&
             (parts ? (
-              <>
+              <span className="chat-user-text">
                 <span className="chat-skill">{parts[0]}</span>
                 {parts[1]}
-              </>
+              </span>
             ) : (
-              renderWithMentions(item.text)
+              <span className="chat-user-text">{renderWithMentions(item.text)}</span>
             ))}
         </div>
       );
