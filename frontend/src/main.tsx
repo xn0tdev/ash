@@ -90,6 +90,23 @@ new MutationObserver((mutations) => {
 });
 
 async function start() {
+  // Surface any startup failure on-screen — without this a throw leaves the
+  // gray splash up and there's no clue what's broken. Set up global handlers
+  // FIRST so even an error before the try-block is visible.
+  const showError = (e: unknown) => {
+    const splash = document.getElementById("splash");
+    if (splash) splash.remove();
+    const root = document.getElementById("root")!;
+    root.innerHTML =
+      '<div style="font-family:Consolas,monospace;color:#ff6369;padding:24px;font-size:13px;white-space:pre-wrap;background:#0a0a0a;min-height:100vh">' +
+      "Ash failed to start:\n\n" + String(e) + "\n\n" +
+      (e instanceof Error ? e.stack ?? "" : "") +
+      "</div>";
+    console.error("startup error:", e);
+  };
+  window.addEventListener("error", (e) => showError(e.error ?? e.message));
+  window.addEventListener("unhandledrejection", (e) => showError(e.reason));
+
   try {
   // Kick off every independent startup read at once instead of serially:
   //  - settings.json (needed for the theme, so we await it first),
@@ -141,16 +158,7 @@ async function start() {
     <App />,
   );
   } catch (e) {
-    // Surface startup failures on-screen instead of leaving the gray splash —
-    // the Wails port's shim/binding mismatches show up here first.
-    const splash = document.getElementById("splash");
-    if (splash) splash.remove();
-    const root = document.getElementById("root")!;
-    root.innerHTML =
-      '<div style="font-family:Consolas,monospace;color:#ff6369;padding:24px;font-size:13px;white-space:pre-wrap">' +
-      "Ash failed to start:\n\n" + String(e) + "\n\n" +
-      (e instanceof Error ? e.stack ?? "" : "") +
-      "</div>";
+    showError(e);
     return;
   }
 
