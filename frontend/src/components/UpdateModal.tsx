@@ -66,12 +66,17 @@ export default function UpdateModal({ onClose }: UpdateModalProps) {
         {r && (
           <div className="update-version">
             <span className="uv-cur">{r.current}</span>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <path d="M5 12h14M13 6l6 6-6 6" />
             </svg>
             <span className="uv-nxt">{r.latest}</span>
           </div>
         )}
+
+        {/* Subtitle — right under the header. */}
+        <p className="update-subtitle">
+          Updating Ash — it will restart automatically.
+        </p>
 
         {/* Progress bar. */}
         {showingProgress && (
@@ -82,11 +87,6 @@ export default function UpdateModal({ onClose }: UpdateModalProps) {
             <span className="progress-pct">{st.percent}%</span>
           </div>
         )}
-
-        {/* Subtitle — what's happening + auto-restart. */}
-        <p className="update-subtitle">
-          Updating Ash — it will restart automatically.
-        </p>
       </div>
     </div>
   );

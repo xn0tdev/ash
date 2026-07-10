@@ -29,12 +29,13 @@
 }
 
 /* ── Update modal ─────────────────────────────────────────
-   Clean, centered: version header (old → new) as the title, a progress bar,
-   a small gap, then a one-line subtitle. Nothing else. Builds on the shared
+   Clean, centered: version header (old → new) as the title, a subtitle
+   right under it, then a progress bar. No border. Builds on the shared
    .modal class (modals.css) for the surface + animation. */
 .update-modal {
   width: 340px;
   padding: 24px 22px 22px;
+  border: none; /* drop the default .modal border */
   text-align: center;
 }
 
@@ -59,16 +60,17 @@
   color: var(--text);
 }
 
-/* Version header — the title. current → latest, centered. */
+/* Version header — the title. current → latest, centered, larger. */
 .update-version {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 9px;
-  margin-bottom: 20px;
-  font-size: 15px;
-  font-weight: 500;
+  gap: 11px;
+  margin-bottom: 8px;
+  font-size: 22px;
+  font-weight: 600;
   color: var(--text);
+  letter-spacing: -0.01em;
 }
 .update-version .uv-cur { color: var(--faint); font-weight: 400; }
 .update-version .uv-nxt { color: var(--text); font-weight: 600; }
@@ -99,10 +101,10 @@
   color: var(--faint);
 }
 
-/* Subtitle — small gap under the progress bar, then one muted line. */
+/* Subtitle — right under the header (a small gap above the progress bar). */
 .update-subtitle {
-  margin: 18px 0 0;
-  font-size: 12px;
+  margin: 0 0 20px;
+  font-size: 12.5px;
   line-height: 1.5;
   color: var(--faint);
 }
