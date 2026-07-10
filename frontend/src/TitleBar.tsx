@@ -37,7 +37,7 @@ export default function TitleBar() {
   return (
     <header className="main-head" style={dragStyle}>
       <span className="head-title" style={dragStyle}>
-        Ash — Wails spike
+        Ash
       </span>
       <div className="head-spacer" style={dragStyle} />
       <div className="head-right" style={noDrag}>
