@@ -236,6 +236,28 @@ const CATEGORIES = [
 
 type CategoryId = (typeof CATEGORIES)[number]["id"];
 
+const SETTING_SEARCH_ITEMS: { cat: CategoryId; label: string; hint: string; keywords?: string }[] = [
+  { cat: "appearance", label: "Theme", hint: "Colors for the whole app and terminal", keywords: "color dark light" },
+  { cat: "appearance", label: "Light mode", hint: "Use the theme's white variant", keywords: "white bright" },
+  { cat: "appearance", label: "Interface scale", hint: "Zoom the whole UI", keywords: "ui size zoom percent" },
+  { cat: "appearance", label: "Terminal font", hint: "Font family for terminal text", keywords: "mono geist jetbrains fira ibm plex source code inconsolata space martian" },
+  { cat: "appearance", label: "Font size", hint: "Terminal font size", keywords: "ctrl plus minus" },
+  { cat: "layout", label: "Explorer side", hint: "File tree position", keywords: "files sidebar left right" },
+  { cat: "sections", label: "Commands", hint: "Quick-launch commands section", keywords: "sidebar quick launch" },
+  { cat: "sections", label: "Agents", hint: "Detected CLI agents section", keywords: "claude codex sidebar" },
+  { cat: "sections", label: "SSH", hint: "SSH hosts section", keywords: "hosts config remote" },
+  { cat: "terminal", label: "Padding", hint: "Space between the app surface and terminal grid", keywords: "gap inset spacing пробел отступ" },
+  { cat: "terminal", label: "Corner radius", hint: "Rounding of terminal pane corners", keywords: "round radius скругление" },
+  { cat: "terminal", label: "Clear on exit", hint: "Wipe chats or terminals when the app quits", keywords: "reset delete cleanup quit close" },
+  { cat: "agents", label: "Permission mode", hint: "Confirm risky actions or full auto", keywords: "approval bash file edits" },
+  { cat: "agents", label: "Sound", hint: "Chime when a task finishes or needs approval", keywords: "audio notification ding" },
+  { cat: "agents", label: "Notifications", hint: "System notification when the window isn’t focused", keywords: "toast alert" },
+  { cat: "agents", label: "Providers", hint: "OpenAI-compatible endpoints", keywords: "api base url key openrouter fireworks" },
+  { cat: "agents", label: "Models", hint: "Active model, context window, vision and fast variant", keywords: "glm grok claude gpt gemini reasoning context" },
+  { cat: "shortcuts", label: "Shortcuts", hint: "Keyboard shortcuts", keywords: "hotkeys keybindings ctrl alt" },
+  { cat: "about", label: "Reset everything", hint: "Delete chats and reset app data", keywords: "factory default wipe" },
+];
+
 function RestoreButton({
   show,
   onClick,
@@ -284,6 +306,7 @@ function Toggle({
 export default function SettingsModal({ onClose }: SettingsModalProps) {
   const [settings, setSettings] = useState<Settings>(getSettings());
   const [cat, setCat] = useState<CategoryId>("appearance");
+  const [search, setSearch] = useState("");
   const [resetOpen, setResetOpen] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [modelEdit, setModelEdit] = useState<EngineModel | null>(null);
@@ -490,6 +513,19 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
     return () => window.removeEventListener("keydown", onKey, true);
   }, [onClose]);
 
+  const searchQuery = search.trim().toLowerCase();
+  const searchResults = searchQuery
+    ? SETTING_SEARCH_ITEMS.filter((item) =>
+        `${item.label} ${item.hint} ${item.keywords ?? ""} ${CATEGORIES.find((c) => c.id === item.cat)?.label ?? ""}`
+          .toLowerCase()
+          .includes(searchQuery),
+      )
+    : [];
+  const jumpToSearchResult = (nextCat: CategoryId) => {
+    setCat(nextCat);
+    setSearch("");
+  };
+
   return (
     <div className="settings-page">
       <nav className="settings-nav" data-tauri-drag-region>
@@ -518,6 +554,52 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
       </nav>
 
       <div className="settings-content" data-tauri-drag-region>
+          <div className="settings-search-wrap" data-tauri-drag-region>
+            <div className="settings-search">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" />
+                <path d="m20 20-3.5-3.5" />
+              </svg>
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search settings…"
+                spellCheck={false}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape" && search) {
+                    e.stopPropagation();
+                    setSearch("");
+                  }
+                }}
+              />
+              {search && (
+                <button type="button" className="settings-search-clear" onClick={() => setSearch("")} aria-label="Clear search">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+                    <path d="M18 6 6 18M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+            {searchQuery && (
+              <div className="settings-search-results">
+                {searchResults.length ? (
+                  searchResults.map((item) => (
+                    <button key={`${item.cat}:${item.label}`} type="button" className="settings-search-result" onClick={() => jumpToSearchResult(item.cat)}>
+                      <span className="settings-search-result-main">
+                        <span>{item.label}</span>
+                        <small>{item.hint}</small>
+                      </span>
+                      <span className="settings-search-result-cat">
+                        {CATEGORIES.find((c) => c.id === item.cat)?.label}
+                      </span>
+                    </button>
+                  ))
+                ) : (
+                  <div className="settings-search-empty">No settings found</div>
+                )}
+              </div>
+            )}
+          </div>
           <div className="settings-inner" data-tauri-drag-region>
             {cat === "appearance" && (
               <section>
