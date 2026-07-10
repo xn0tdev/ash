@@ -29,23 +29,25 @@ var (
 // (frontend/wailsjs/go/...), OR through the Tauri-compat shim
 // (src/shim/core.ts) which routes invoke("read_text", …) → Fs.ReadText(…).
 type App struct {
-	ctx     context.Context
-	pty     *Pty
-	fs      *Fs
-	git     *Git
-	tools   *Tools
-	sandbox *Sandbox
-	updater *Updater
+	ctx      context.Context
+	pty      *Pty
+	fs       *Fs
+	git      *Git
+	tools    *Tools
+	sandbox  *Sandbox
+	updater  *Updater
+	clipboard *ClipboardWatcher
 }
 
 func NewApp() *App {
 	return &App{
-		pty:     NewPty(),
-		fs:      NewFs(),
-		git:     NewGit(),
-		tools:   NewTools(),
-		sandbox: NewSandbox(),
-		updater: NewUpdater(),
+		pty:       NewPty(),
+		fs:        NewFs(),
+		git:       NewGit(),
+		tools:     NewTools(),
+		sandbox:   NewSandbox(),
+		updater:   NewUpdater(),
+		clipboard: NewClipboardWatcher(),
 	}
 }
 
@@ -53,6 +55,7 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	a.pty.startup(ctx)
 	a.updater.startup(ctx)
+	a.clipboard.startup(ctx)
 	storeToolsCtx(ctx)
 }
 
@@ -69,6 +72,7 @@ func (a *App) AppInfo() map[string]string {
 
 func (a *App) shutdown(ctx context.Context) {
 	a.pty.shutdown(ctx)
+	a.clipboard.shutdown(ctx)
 }
 
 // Run builds the Wails app options and starts the event loop. assets is the

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import { ensureSession, getSession } from "../lib/term";
+import { ensureSession, getSession, setFocusedTerminal } from "../lib/term";
 import { isTerminalActive, onTerminalActivityChange } from "../lib/agent-activity";
 import { isBackgroundTerm, onBackgroundTermsChange } from "../lib/background-terms";
 
@@ -77,7 +77,12 @@ export default function TerminalPane({
   }, [id]);
 
   useEffect(() => {
-    if (focused) getSession(id)?.term.focus();
+    if (focused) {
+      setFocusedTerminal(id);
+      getSession(id)?.term.focus();
+    } else {
+      setFocusedTerminal(null);
+    }
   }, [focused, id]);
 
   return (
