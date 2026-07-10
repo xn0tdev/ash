@@ -298,23 +298,20 @@ function attachRenderer(session: TermSession, host: HTMLElement, useWebgl = true
       writeText(term.getSelection()).catch(() => {});
       return false;
     }
-    // Paste: Ctrl+V / Ctrl+Shift+V. xterm's default forwards Ctrl+V as the
-    // 0x16 "literal-next-char" control byte to the pty — NOT a paste — so
-    // keyboard paste never inserted anything, and external dictation apps
-    // (Wispr Flow) that inject via clipboard + a synthetic keystroke couldn't
-    // paste either. Intercept and read the clipboard, then write the text
-    // straight to the pty. Returning false makes xterm preventDefault the
-    // keydown — so the browser's native paste event never fires and there's
-    // no double-paste (we own it).
+    // Paste: Ctrl+V / Ctrl+Shift+V. DON'T preventDefault here — let the
+    // browser's native paste event fire on xterm's textarea, and let the
+    // synchronous `paste` listener on the container (see below) catch it.
+    // That listener reads e.clipboardData synchronously (zero race), which is
+    // exactly how the chat composer pastes — so external dictation apps
+    // (Wispr Flow) that set the clipboard and simulate Ctrl+V work without
+    // holding any modifier. Returning false here used to kill the native
+    // paste event and force a racy async clipboard read, which is why Wispr
+    // Flow lost the race and didn't auto-insert.
     //
-    // External dictation apps (Wispr Flow) race the clipboard: they set it
-    // and simulate the keystroke near-simultaneously, so a single async read
-    // can come back empty. Retry a few times with backoff, and try BOTH the
-    // Tauri clipboard binding and the web navigator.clipboard API — whichever
-    // returns text first wins.
+    // We only suppress Ctrl+V when the terminal has no host (defensive —
+    // shouldn't happen) so xterm never sends the 0x16 literal-next byte.
     if (e.ctrlKey && !e.altKey && e.code === "KeyV") {
-      pasteFromClipboard(id);
-      return false;
+      return true; // let the native paste event flow → sync listener handles it
     }
     // App-level shortcuts pass through untouched.
     if (
@@ -344,24 +341,26 @@ function attachRenderer(session: TermSession, host: HTMLElement, useWebgl = true
     }
   });
 
-  // Synchronous paste event — the reliable path for external dictation apps
-  // (Wispr Flow) that dispatch a paste event directly. e.clipboardData is
-  // available synchronously inside the event, so there's no async race: we
-  // get exactly the text being pasted, the instant it's pasted. Capture +
-  // stopPropagation so xterm's own textarea paste handler never also fires
-  // (which would double-paste).
+  // Synchronous paste event — the reliable path for ALL pastes (human
+  // Ctrl+V, Ctrl+Shift+V, right-click paste, and external dictation apps like
+  // Wispr Flow that set the clipboard + simulate Ctrl+V). e.clipboardData is
+  // available synchronously inside the event, so there's zero race — we get
+  // exactly the text being pasted, the instant it's pasted. This mirrors how
+  // the chat composer pastes (onPaste + e.clipboardData), which is why the
+  // chat works and the terminal didn't. Capture + stopImmediatePropagation so
+  // xterm's own textarea paste handler never also fires (no double-paste).
   container.addEventListener(
     "paste",
     (e: ClipboardEvent) => {
       const text = e.clipboardData?.getData("text/plain");
       if (text) {
         e.preventDefault();
-        e.stopPropagation();
+        e.stopImmediatePropagation();
         used.add(id);
         ptyWrite(id, text);
       }
     },
-    true, // capture: beat xterm's own paste handler
+    true, // capture: beat xterm's own paste handler (runs before the textarea target phase)
   );
 
   term.onData((data) => {

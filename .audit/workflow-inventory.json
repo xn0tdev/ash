@@ -1,0 +1,193 @@
+{
+  "feature": "workflow (run_workflow, spawn_agents)",
+  "root": "frontend/src/lib/agent-engine/tools/workflow.ts",
+  "dependencies": [
+    "frontend/src/lib/agent-engine/tools/workflow.ts",
+    "frontend/src/lib/agent-engine/tools/registry.ts",
+    "frontend/src/lib/agent-engine/loop.ts",
+    "frontend/src/lib/agent-engine/session.ts",
+    "frontend/src/lib/agent-engine/types.ts",
+    "frontend/src/lib/agent-engine/tools/agent-bg.ts",
+    "frontend/src/lib/agent-engine/tools/bash-background.ts",
+    "frontend/src/lib/agent-engine/roles.ts",
+    "frontend/src/lib/bg-agents.ts"
+  ],
+  "registration": {
+    "file": "frontend/src/lib/agent-engine/tools/registry.ts",
+    "notes": "runWorkflowTool + spawnAgentsTool appended to TOOLS array (lines 18-19). byName map + toolSchemas() advertise them to the model. toolSchemas(allowed) filters by role whitelist — but run_workflow/spawn_agents are NOT in any role's tools list (roles.ts ALL_TOOL_NAMES omits them), so only the 'general'/unset-allowedTools session (main chat) exposes them. Background sub-agents can never call run_workflow/spawn_agents themselves."
+  },
+  "runWorkflowTool": {
+    "file": "frontend/src/lib/agent-engine/tools/workflow.ts",
+    "signature": "run(args, ctx) -> Promise<{ok, output}>",
+    "steps": [
+      { "step": "validate goal", "ref": "workflow.ts:57-58", "detail": "trim goal; empty -> {ok:false}" },
+      { "step": "clamp counts", "ref": "workflow.ts:59-61", "detail": "reviewers=clamp(args.reviewers??3,1,ROLES.reviewer.poolSize=10); editors=clamp(args.editors??0,0,10); verify=args.verify ?? (editors>0)" },
+      { "step": "timer", "ref": "workflow.ts:63-67", "detail": "t0=Date.now(); took() formats elapsed for the report" },
+      { "step": "abort handler", "ref": "workflow.ts:71-73", "detail": "all=[]; onAbort=()=>all.forEach(stopOrRemoveBgAgent); ctx.signal.addEventListener('abort',onAbort,{once:true})" },
+      { "step": "reserve helper", "ref": "workflow.ts:75-80", "detail": "reserve(n,role,hint) -> reserveBgAgent per slot, pushed into `all`. NO pool-size check at reserve time." },
+      { "step": "runStage helper", "ref": "workflow.ts:82-85", "detail": "Promise.all(stage.map(activateBgAgent(a,task(i)))); then markBgAgentReported(a.id) for each; return done agents" },
+      { "step": "reserve whole team up front", "ref": "workflow.ts:90-93", "detail": "reviewerAgents=reserve(reviewers,...); editorAgents=reserve(editors,...); verifierAgents=verify?reserve(1,...):[]. All created 'waiting' so sidebar shows full team immediately." },
+      { "step": "Stage 1 review", "ref": "workflow.ts:96-101", "detail": "runStage(reviewerAgents, task building read-only review prompt with focusOf(i)); abort check after" },
+      { "step": "build reviewReport", "ref": "workflow.ts:103-105", "detail": "concatenate '## {name} — {focus}\\n{a.result || (no findings)}' per reviewer" },
+      { "step": "review-only early return", "ref": "workflow.ts:107-108", "detail": "if editors===0 return {ok:true, 'Review complete...'} — NOTE: verify:true with editors===0 is silently ignored here" },
+      { "step": "Stage 2 edit", "ref": "workflow.ts:112-117", "detail": "runStage(editorAgents,...); 1 editor gets full findings; >1 gets modulo-N slice instruction (prompt-level, unenforceable). abort check after" },
+      { "step": "build editReport", "ref": "workflow.ts:119", "detail": "'## {name}\\n{a.result || (no summary)}' per editor" },
+      { "step": "no-verifier early return", "ref": "workflow.ts:121-126", "detail": "if !verifierAgents.length return {ok:true, edits report}" },
+      { "step": "Stage 3 verify", "ref": "workflow.ts:129-139", "detail": "runStage(verifierAgents, verify prompt w/ reviewReport+editReport); destructure [verifier]; return {ok:true, verification+edits}" },
+      { "step": "finally", "ref": "workflow.ts:141-142", "detail": "removeEventListener('abort',onAbort). NO cleanup of still-working agents on unexpected throw." }
+    ],
+    "returns_to_model": {
+      "ok_true": "always ok:true for any non-abort, non-empty-goal completion — even if every sub-agent failed (pool full) or returned empty. Only abort and empty-goal yield ok:false.",
+      "shape": "a single Markdown string with took() timing, per-stage '## name' sections built from each agent's a.result (final assistant text), '(no findings)'/'(no summary)'/'(no verdict)' fallbacks for empty results."
+    },
+    "result_gathering": {
+      "mechanism": "activateBgAgent(a, task) (bg-agents.ts) runs session.prompt(task) and resolves with the agent object after it settles. extractResult(session) (bg-agents.ts) walks history backwards for the last assistant message with non-empty text and returns its trimmed text -> a.result.",
+      "blocking": "run_workflow BLOCKS the parent turn: loop.ts sits inside `await tool.run(...)` for the entire duration of all stages. Parent model gets no stream/iteration until the whole pipeline finishes.",
+      "reporting": "markBgAgentReported(a.id) called per agent after each stage (workflow.ts:84) — sets reported=true + scheduleRemoval (60s TTL fade)."
+    }
+  },
+  "spawnAgentsTool": {
+    "file": "frontend/src/lib/agent-engine/tools/workflow.ts",
+    "signature": "run(args, ctx) -> Promise<{ok, output}>",
+    "steps": [
+      { "step": "resolve role", "ref": "workflow.ts:168", "detail": "resolveRole(args.role??'general'). enum lacks 'custom' so custom->general silently." },
+      { "step": "normalize tasks", "ref": "workflow.ts:169-170", "detail": "stringify+trim+filter Boolean; empty -> {ok:false}" },
+      { "step": "loop start", "ref": "workflow.ts:173-180", "detail": "for each task: startBgAgent(task,cwd,ownerId,role). managed defaults to FALSE (fire-and-forget; results delivered as stray notes to owner via onBgAgentFinished). On throw (pool full): set poolMsg, BREAK — remaining tasks never started." },
+      { "step": "return", "ref": "workflow.ts:182-187", "detail": "if none started -> {ok:false}; else {ok:true, 'Started N role agent(s): names. ... End your turn now.'}" }
+    ],
+    "returns_to_model": "immediate ack string; results are NOT returned by this tool — they arrive later as auto-delivered notes (wired outside these files via onBgAgentFinished).",
+    "not_abort_linked": "no ctx.signal listener; spawned agents outlive the parent turn by design."
+  },
+  "concurrency_budget_retries_timeouts": {
+    "concurrency": {
+      "per_role_pool": "bg-agents.ts activateBgAgent checks `running = agents.filter(status==='working' && role.id===a.role.id).length; if running>=role.poolSize(10) -> status='failed', result='pool full', resolve (NOT reject). Same check in startBgAgent but as a throw.",
+      "within_runStage": "Promise.all(stage.map(activateBgAgent)). map invokes activateBgAgent synchronously per element so the working-count check sees prior siblings already marked working — sequential enough within one stage.",
+      "reserve_has_NO_pool_check": "reserveBgAgent/newBgRecord (bg-agents.ts) never checks pool size; only counts 'working' (not 'waiting') at activation. So reserving is unbounded; overflow surfaces as per-agent 'failed: pool full' at activation."
+    },
+    "budget": "NONE. No token budget, no cost cap. Sub-agents each run the full loop.ts with MAX_TOKENS=16384 per call and MAX_ITERATIONS=100 round-trips.",
+    "retries": "NONE in workflow. loop.ts has emptyRetries (<=2) for empty model replies inside each sub-agent. No retry of failed sub-agents, no retry of stages.",
+    "timeouts": "NONE. No wall-clock cap on a sub-agent or the whole workflow. Only termination is user Stop (ctx.signal abort) or the sub-agent exhausting MAX_ITERATIONS. A runaway sub-agent blocks the workflow indefinitely.",
+    "abort": "runWorkflowTool registers onAbort on ctx.signal (workflow.ts:72-73) -> stopOrRemoveBgAgent on all. stopOrRemoveBgAgent: working->status='stopped'+session.cancel()+scheduleRemoval; waiting->immediate remove. activateBgAgent's .then/.catch skip on status!=='working'; .finally skips 'worked' item on 'stopped' but still resolves -> Promise.all resolves, no hang. spawnAgentsTool has NO abort handling."
+  },
+  "suspicious_spots": [
+    {
+      "id": "S1",
+      "severity": "major",
+      "title": "Workflow returns ok:true even when all sub-agents failed (pool full)",
+      "ref": "workflow.ts:108,123,135 (ok:true) + bg-agents.ts activateBgAgent pool-full path (status='failed', result='pool full', resolve)",
+      "detail": "If the reviewer/editor pool is already full from other agents when a stage activates, activateBgAgent marks each agent status='failed' with result='The Reviewer pool is full (10).' and resolves. runStage collects these, markBgAgentReported runs, and the workflow builds a report whose sections read 'The Reviewer pool is full (10).' — then returns {ok:true}. The model is told the workflow SUCCEEDED. No aggregation of sub-agent ok/failure into the workflow's ok flag. Same for editors and verifier."
+    },
+    {
+      "id": "S2",
+      "severity": "major",
+      "title": "verify:true with editors:0 is silently ignored",
+      "ref": "workflow.ts:61,107-108",
+      "detail": "verify = args.verify ?? editors>0. If the model passes verify:true and editors:0 (or omitted), verify becomes true and a verifier IS reserved (workflow.ts:93), but the editors===0 early-return at line 107 exits before the verifier stage. The reserved verifier agent is left 'waiting' and only cleaned by the finally's removeEventListener (NOT stopOrRemove — onAbort is only triggered by abort, not normal return). So on this path the verifier reservation leaks as a永久 'waiting' row in the sidebar until the 60s scheduleRemoval... except scheduleRemoval is never called for it (markBgAgentReported never runs on it). It stays forever. BUG: leaked waiting verifier + silently dropped verify request."
+    },
+    {
+      "id": "S3",
+      "severity": "major",
+      "title": "No timeout/budget — runaway sub-agent blocks workflow forever",
+      "ref": "workflow.ts (none) + loop.ts MAX_ITERATIONS=100 per sub-agent",
+      "detail": "Neither run_workflow nor activateBgAgent impose any wall-clock, token, or iteration cap on the workflow as a whole. Each sub-agent can run up to 100 loop iterations x 16384 tokens. The parent turn is blocked in await tool.run the entire time. Only a manual user Stop breaks it. A stuck sub-agent (e.g. model looping on a skill, the exact failure mode loop.ts's MAX_ITERATIONS was added for) stalls the whole workflow with no progress signal to the model."
+    },
+    {
+      "id": "S4",
+      "severity": "major",
+      "title": "extractResult misses tool-only / empty final turns — results silently '(no findings)'",
+      "ref": "bg-agents.ts extractResult()",
+      "detail": "extractResult returns the trimmed text of the last assistant message with non-empty text. If a sub-agent's final turn is only tool_use blocks (no text), or it hit the empty-reply exhaustion path in loop.ts (returns without a final assistant push), or ended on a tool_result with no follow-up text, a.result='' and the workflow reports '(no findings)'/'(no summary)'/'(no verdict)'. The sub-agent's actual work (in tool calls / file edits) is invisible to the workflow report. Especially damaging for the verifier: a run-build-then-no-prose verifier yields '(no verdict)'."
+    },
+    {
+      "id": "S5",
+      "severity": "major",
+      "title": "External stop of a workflow agent is silently treated as 'no findings'",
+      "ref": "workflow.ts:84,103-105,119,139 + bg-agents.ts stopOrRemoveBgAgent",
+      "detail": "If the user (sidebar) or the model (stop_agent tool) stops a workflow sub-agent mid-stage, that agent -> status='stopped', a.result stays '' (the .then guard `if status!=='working' return` skips extractResult). runStage still awaits and returns it, markBgAgentReported runs, and the stage report shows '(no findings)'/'(no summary)'. The workflow has no detection that a member was externally stopped — it proceeds to the next stage as if that agent simply found nothing. Editors then 'fix' a review that's missing a chunk; verifier signs off. No ok:false, no warning."
+    },
+    {
+      "id": "S6",
+      "severity": "minor",
+      "title": "Unexpected throw between stages orphans already-activated agents",
+      "ref": "workflow.ts:141-142 finally",
+      "detail": "The try/finally only removes the abort listener. If anything between stages throws (e.g. a synchronous error building reviewReport, or activateBgAgent ever rejecting — currently it doesn't), already-activated agents in `all` remain 'working' with no stopOrRemoveBgAgent. They keep running in the background, consuming pool slots, with no one awaiting their result. Low likelihood (activateBgAgent never rejects, report building is pure string concat) but the cleanup gap is real."
+    },
+    {
+      "id": "S7",
+      "severity": "minor",
+      "title": "Reserve can create >10 agents of a role; names/colors collide past 10",
+      "ref": "bg-agents.ts newBgRecord + workflow.ts:90-93",
+      "detail": "A single workflow can reserve up to 10 reviewers + 10 editors + 1 verifier = 21 'waiting' agents. newBgRecord picks from NAMES (10) and COLORS (10); the 11th+ gets name `Agent {n}` and reuses color/variant at idx=agents.length%10. Cosmetic, but the sidebar shows duplicate-looking agents. More importantly, reserveBgAgent has no pool check, so combined with other concurrent workflows/agents the role pool can be massively over-reserved; the overflow only surfaces as silent per-agent 'failed: pool full' at activation (see S1)."
+    },
+    {
+      "id": "S8",
+      "severity": "minor",
+      "title": "Editor 'modulo N' slice instruction is unenforceable and vague",
+      "ref": "workflow.ts:115",
+      "detail": "Editors >1 are told 'work ONLY on findings whose position (counting top to bottom across the whole review) modulo N equals i'. The reviewReport is unnumbered Markdown — editors cannot reliably identify 'position'. Position indexing (0 vs 1) is ambiguous vs i (0-indexed). Two editors may both fix the same finding or skip some. No structural enforcement; relies entirely on model compliance. Concurrent editors also race on shared files despite 'do not touch their files' (no file-level locking)."
+    },
+    {
+      "id": "S9",
+      "severity": "minor",
+      "title": "Concurrent editors race on the same files with no locking",
+      "ref": "workflow.ts:112-115 (Promise.all of editors) + editor role full-auto",
+      "detail": "Multiple editors run in parallel (Promise.all) against the same repo. The prompt says 'do not touch their files' but nothing enforces it. Two editors editing the same file concurrently via edit_file can produce conflicting edits / last-write-wins corruption. No file locking, no serialization."
+    },
+    {
+      "id": "S10",
+      "severity": "minor",
+      "title": "Workflow editors edit live files with no safe-mode/merge review",
+      "ref": "workflow.ts (edits via editor role, permissionMode 'full-auto') + bg-agents.ts onPermissionRequest auto-approve",
+      "detail": "The main chat has safe mode (onMergeReview / propose_merge) so edits get reviewed. Workflow editors (editor role, permissionMode 'full-auto') edit the real cwd directly with all permissions auto-approved (bg-agents.ts onPermissionRequest -> resolvePermission(id,true)). A run_workflow with editors>0 silently mutates files with no human gate and no merge-review UI. The user only sees agents in the sidebar."
+    },
+    {
+      "id": "S11",
+      "severity": "minor",
+      "title": "spawnAgentsTool breaks on first pool-full and silently drops remaining tasks",
+      "ref": "workflow.ts:174-180",
+      "detail": "The for-loop breaks on the first startBgAgent throw. If task 3 of 5 hits a full pool, tasks 4-5 are never started and the model is told 'Started 3 ... Could not start the rest: ...'. The 3 that started are fire-and-forget. The model may not realize the dropped tasks were never queued — they aren't retried or surfaced as a clean per-task failure list."
+    },
+    {
+      "id": "S12",
+      "severity": "minor",
+      "title": "REVIEW_FOCUS has 5 entries but up to 10 reviewers — focuses repeat",
+      "ref": "workflow.ts:23-28 (REVIEW_FOCUS) + focusOf(i%len) at :29",
+      "detail": "reviewers max is 10 but REVIEW_FOCUS.length is 5, so reviewers 6-10 get identical focus labels to 1-5. Two reviewers with the same focus duplicate effort. Cosmetic/redundancy, not correctness."
+    },
+    {
+      "id": "S13",
+      "severity": "minor",
+      "title": "markBgAgentReported on stopped/pool-full agents triggers premature fade while later stages run",
+      "ref": "workflow.ts:84 + bg-agents.ts markBgAgentReported -> scheduleRemoval (60s TTL)",
+      "detail": "After Stage 1, every reviewer is markBgAgentReported -> scheduleRemoval sets a 60s timer to delete the agent. If Stage 2+3 take >60s (likely for real edits+verify), reviewers vanish from the sidebar mid-workflow. The reviewReport string is already captured so the report is unaffected, but the user loses the ability to inspect reviewer transcripts while the workflow is still running. Behavior-by-design but surprising."
+    },
+    {
+      "id": "S14",
+      "severity": "low",
+      "title": "managed flag trust — stray-note suppression is external to these files",
+      "ref": "bg-agents.ts managed=true via reserveBgAgent; onBgAgentFinished doneListeners",
+      "detail": "Workflow agents are managed=true so the owner chat's auto-wake (onBgAgentFinished consumer, not in these files) is expected to NOT re-deliver their results as stray notes. run_workflow instead reads a.result directly. If the external wake logic fails to honor managed, the parent chat would get duplicate results (once from the tool, once as a note). Cannot verify from these files — flag for the consumer-side audit."
+    },
+    {
+      "id": "S15",
+      "severity": "low",
+      "title": "double-activation guard returns agent mid-flight instead of settled",
+      "ref": "bg-agents.ts activateBgAgent `if (a.status !== 'waiting') return Promise.resolve(a)`",
+      "detail": "If activateBgAgent is called twice on the same agent, the second call returns Promise.resolve(a) immediately with the agent in its CURRENT state (possibly 'working'), not after completion. runStage's `done` would then hold a not-yet-settled agent and markBgAgentReported would run on a working agent. runStage never double-activates today, but the guard's semantics (resolve-with-current vs reject/no-op) are a latent footgun if a future caller retries."
+    },
+    {
+      "id": "S16",
+      "severity": "low",
+      "title": "clamp uses Number(n)||0 — NaN/non-numbers silently become 0 then clamped to min",
+      "ref": "workflow.ts:18-19",
+      "detail": "clamp does Math.round(Number(n)||0). If the model sends reviewers:'three' or {reviewers:[3]}, Number(...) is NaN, ||0 -> 0, then clamp(0,1,10)=1 for reviewers and clamp(0,0,10)=0 for editors. So a malformed reviewers arg silently runs 1 reviewer; a malformed editors arg silently runs 0 editors (skipping edit+verify). No error surfaced to the model. Arg parsing errors are handled generically in loop.ts via _parseError, but type-coerced-but-invalid numbers slip through."
+    }
+  ],
+  "open_questions_for_bug_hunt": [
+    "Where is onBgAgentFinished consumed, and does it correctly skip managed agents (S14)? Does it wake a background-agent owner (general role spawning via spawn_agents) the same way it wakes the main chat?",
+    "Is there any UI/code path that can stop a single workflow sub-agent without aborting the whole workflow (triggers S5)? stop_agent tool + sidebar close both can — confirm.",
+    "Does the leaked 'waiting' verifier in S2 actually persist forever (no scheduleRemoval on never-activated never-reported waiting agents)? Confirm newBgRecord sets no removal timer and nothing else cleans waiting agents except stopOrRemoveBgAgent.",
+    "Are there other callers of reserveBgAgent/activateBgAgent besides workflow.ts? (grep says only workflow.ts imports them.)",
+    "Does extractResult's 'last assistant text' match what the loop actually emits on MAX_ITERATIONS overflow (loop.ts pushes a wrap-up assistant message) vs empty-reply exhaustion (loop.ts returns with NO assistant push -> result='')? Confirm S4 for the exhaustion path."
+  ]
+}

@@ -1,0 +1,82 @@
+[
+  {
+    "severity": "major",
+    "file": "frontend/src/lib/agent-engine/tools/workflow.ts",
+    "line": "103-105, 119, 139",
+    "bug": "No context-budget truncation. The final `output` is a plain string concatenation of every sub-agent's full final assistant text: `reviews.map(...).join` + `edits.map(...).join` + `verifier.result`. There is no char/token cap, no per-section cap, no total cap, no 'top N'. Each sub-agent can emit up to MAX_TOKENS=16384 per call across many calls; 10 reviewers + 10 editors + a verifier can easily produce a 100k+ token blob that is returned verbatim as the tool result the parent model must ingest.",
+    "why_it_bites": "The tool's stated purpose is a 'consolidated report to the model', but nothing is consolidated. The blob either overflows the parent's context window (triggering compaction that can drop the model's actual plan/history) or drowns the model in repetition so it has to re-synthesize in its own context. The synthesis burden is pushed back onto the caller instead of being done where the parallel results are already in hand.",
+    "fix_idea": "Run a final synthesis agent (see R5) whose output is capped to a budget (~4-8k tokens). As a non-agent floor, truncate each section to a char cap and the whole report to a total cap, emitting '(truncated — N more findings omitted, see transcripts)' when cut. Never return unbounded concatenation as a tool result."
+  },
+  {
+    "severity": "major",
+    "file": "frontend/src/lib/agent-engine/tools/workflow.ts",
+    "line": "82-85, 103-105, 119, 139",
+    "bug": "No null/empty/failed filtering before synthesis — the mechanical root. `runStage` returns `done` = the raw `Promise.all` result. `activateBgAgent` (bg-agents.ts) RESOLVES (never rejects) for pool-full (`status='failed'`, `result='The Reviewer pool is full (10).'`) and for external stop (`status='stopped'`, `result=''`). So `done` contains failed and stopped agents. The report builders then `.map` over ALL of them with `a.result || '(no findings)'` / `'(no summary)'` / `'(no verdict)'`. There is no `.filter(a => a.status === 'done')` anywhere.",
+    "why_it_bites": "Three distinct outcomes — 'ran and found nothing', 'never ran (pool full)', 'stopped by user/system' — are all flattened into the same section-header + fallback-string shape. The pool-full error text is emitted INSIDE a '## Reviewer — focus' section as if it were a finding; the model may read 'The Reviewer pool is full (10).' as a finding about the project. Stopped agents read '(no findings)' = a positive claim of nothingness. This violates the guideline 'return empty and say so rather than pad' in both directions: empty agents are padded with headers, and the failure reason is disguised as content.",
+    "fix_idea": "Partition each stage by status: `const ok = stage.filter(a => a.status === 'done')`, `const failed = stage.filter(a => a.status !== 'done')`. Render only `done` agents as findings sections; render `failed`/`stopped` as an explicit '[did not run: pool full]' / '[stopped]' callout, or omit with a count in the summary. Derive the workflow's `ok` from `ok.length` (see R3)."
+  },
+  {
+    "severity": "major",
+    "file": "frontend/src/lib/agent-engine/tools/workflow.ts",
+    "line": "108, 123, 135",
+    "bug": "No aggregation of sub-agent outcomes into the workflow's `ok`. Every non-abort, non-empty-goal completion returns `{ ok: true, ... }` — even when every sub-agent failed with 'pool full' or was stopped. There is no assertion step that checks whether any real work happened before claiming success.",
+    "why_it_bites": "The model treats `ok:true` as success. If all reviewers failed (pool full), the report body is N× 'The Reviewer pool is full (10).' and the model is told the workflow SUCCEEDED. It may act on the (nonexistent) findings, report success to the user, or hand off to a downstream step. A 100% failure is synthesized as a success — the opposite of a consolidation/verdict.",
+    "fix_idea": "After each stage, count `done` vs `failed`/`stopped`. If zero `done`, return `{ ok: false, output: 'All <role> agents failed to run (pool full). No findings.' }`. If partial, set `ok` to a partial/falsy state or prefix the report with a warning like '⚠ 2 of 5 reviewers did not complete.' The final return must be a verdict derived from sub-results, not a constant."
+  },
+  {
+    "severity": "major",
+    "file": "frontend/src/lib/agent-engine/tools/workflow.ts",
+    "line": "103-105, 112-117, 129-139",
+    "bug": "No dedup across reviewers. `reviewReport` concatenates every reviewer's text verbatim. Reviewers overlap heavily (a security bug is also an edge-case bug), and `REVIEW_FOCUS` has only 5 entries for up to 10 reviewers (focusOf(i % 5)), so reviewers 6-10 get identical focus labels to 1-5 and duplicate effort by construction. The duplicated blob is then fed raw to every editor ('Review findings:\\n${reviewReport}') and to the verifier, and finally to the parent model.",
+    "why_it_bites": "The same finding appears 2-3× in the review, in the editor prompt, in the verifier prompt, and in the final report. Editors may 'fix' the same finding multiple times or get confused about which is the canonical mention; the verifier 'verifies' duplicates; the model reads repetition that looks like multiple distinct findings. Wasteful context (compounds R1) and actively misleading downstream stages.",
+    "fix_idea": "Add a dedup/merge pass over reviewer outputs before feeding editors: cluster by file:line (parse from the prompt-required 'file:line' format), keep the highest-severity mention, drop duplicates. This is exactly what the final synthesis agent (R5) should do; at minimum, expand REVIEW_FOCUS to ≥10 or accept >10 only with explicit duplicate acknowledgment."
+  },
+  {
+    "severity": "major",
+    "file": "frontend/src/lib/agent-engine/tools/workflow.ts",
+    "line": "96-139 (whole run body)",
+    "bug": "No final synthesis/assertion agent. The workflow-tool design guideline explicitly calls for a final synthesis/assertion agent that 'de-duplicates, ranks by confidence/severity, and caps the output', plus a 'what's missing' critic, and 'return an empty result and say so rather than padding.' This implementation is pure concatenation with `## name` headers. There is no dedup, no severity ranking, no roll-up, no 'what's missing' check, no assertion that the work actually happened. Stage 3 'verify' is a build/test runner, not a synthesis of the whole pipeline.",
+    "why_it_bites": "The entire value proposition of a multi-agent workflow — parallel breadth → one consolidated signal — is lost. The parent model gets raw parallel output and must do the synthesis itself, in its own context, against the R1 budget blowup. Both sides of the 'say so rather than pad' rule are violated: empty agents are padded with '(no findings)', and the ok flag is padded with `true` regardless of outcome.",
+    "fix_idea": "Add a Stage 4 synthesis agent (a dedicated synthesizer or verifier-role) that takes reviewReport + editReport + verifier result and returns a compact, de-duplicated, severity-ranked digest with an explicit verdict (pass/fail/partial) and a 'what's missing' note. Cap its output. Make `output` be that digest; emit the raw sections only as a budgeted appendix. Run the same synthesizer on the review-only path (R9)."
+  },
+  {
+    "severity": "major",
+    "file": "frontend/src/lib/bg-agents.ts",
+    "line": "131-137 (extractResult)",
+    "bug": "`extractResult` only reads the TEXT blocks of the last assistant message with non-empty text. A sub-agent whose final turn is tool_use-only (no prose), or that ended on a tool_result with no follow-up assistant text, or that hit the empty-reply exhaustion path in loop.ts (returns with NO final assistant push) yields `a.result = ''`. The workflow then reports '(no findings)' / '(no summary)' / '(no verdict)' — while the actual work happened in tool calls (read_file, grep, edit_file, build runs) and is in the transcript.",
+    "why_it_bites": "The synthesis is built on a lossy extractor. Real findings (a reviewer that did its analysis via tools and ended without a prose summary) and real edits (an editor that ran edit_file and ended on a tool_result) are silently dropped. The verifier is the worst case: it runs the build/tests via tools and ends on tool output with no prose → '(no verdict)', yet the workflow claims verify completed (R7). The report understates or omits what actually happened, violating 'say so rather than pad' — it asserts nothingness where the truth is 'work happened but wasn't captured as prose'.",
+    "fix_idea": "Make extractResult fall back to the last assistant message regardless of text emptiness, surfacing a structured summary of its tool calls (e.g. 'ended on tool: edit_file(foo.ts) — no prose summary'). Better: require each sub-agent by prompt to emit a structured final summary (the review prompt already asks for 'file:line, severity, one-line description' — parse that), and have the synthesis read the structured form, not freeform text. At minimum, when result is empty but the transcript has tool calls, emit '(agent ended without a prose summary — see transcript)' instead of '(no findings)'."
+  },
+  {
+    "severity": "major",
+    "file": "frontend/src/lib/agent-engine/tools/workflow.ts",
+    "line": "129-139",
+    "bug": "Verifier '(no verdict)' still returns `ok:true` with 'Workflow complete in ... → verify.' If the verifier was stopped (result=''), failed (pool full: result='The Verifier pool is full (10).'), or ended on a tool-only turn (ran the build but wrote no prose, R6), `verifier?.result || '(no verdict)'` emits '(no verdict)' — and the surrounding message still says 'complete → verify' and `ok:true`. There is no assertion that verification actually produced a pass/fail.",
+    "why_it_bites": "Verification is the safety gate before declaring the work done. A no-op or failed verifier slips through as success. The model reads 'complete' + '(no verdict)' + ok:true as 'verified, all good' and may tell the user the fixes pass with NO verification having actually happened. This is the most dangerous synthesis gap because it's the final assertion the model trusts.",
+    "fix_idea": "If `verifier.status !== 'done'` or `verifier.result` is empty, do NOT claim success. Return `{ ok: false, output: 'Verification did not produce a verdict (verifier ' + status + '). Do not assume the fixes pass.\\n\\n### Edits\\n' + editReport }`. Parse the verifier's text for an explicit pass/fail signal and reflect that in `ok` and the top-line verdict."
+  },
+  {
+    "severity": "minor",
+    "file": "frontend/src/lib/agent-engine/tools/workflow.ts",
+    "line": "139",
+    "bug": "`verifier?.result` uses optional-chaining that papers over a missing verifier. `verifierAgents.length` is 1 when verify is true, so `verifier` should always be defined — but the `?.` silently handles the undefined case by emitting '### Verification\\n(no verdict)' inside an ok:true 'Workflow complete → verify' message, claiming a verification stage ran when no verifier existed.",
+    "why_it_bites": "Silent assertion of a stage that didn't run. Low likelihood under current control flow (the only way `verifier` is undefined is a future code path or a reserved agent removed between the length check and the stage), but the `?.` is a latent lie: it converts a should-never-happen undefined into a plausible-looking '(no verdict)' success instead of a hard error.",
+    "fix_idea": "Assert `verifier` is defined before building the verification section: `if (!verifier) return { ok: false, output: 'Verify stage did not run.' }`. Drop the `?.` — a defined-by-construction value should not be optional-chained."
+  },
+  {
+    "severity": "major",
+    "file": "frontend/src/lib/agent-engine/tools/workflow.ts",
+    "line": "107-108",
+    "bug": "The review-only early return (editors===0) returns the raw `reviewReport` concatenation with no synthesis, no digest, no dedup, no severity roll-up. This is the DEFAULT mode (reviewers defaults to 3, editors defaults to 0, verify defaults to false) and it has the worst synthesis of all paths — pure `## name\\n${a.result || '(no findings)'}` join. (Bonus: if verify was true, a verifier was reserved at line 93 and is leaked here — see S2 in the inventory — but the synthesis angle stands even without that.)",
+    "why_it_bites": "The most common invocation of run_workflow — 'give me a thorough review' — hands the model N raw, overlapping reviewer transcripts and calls it a 'consolidated report.' The model must do all the dedup/ranking/digestion itself in its own context. The whole point of running a multi-agent review is lost.",
+    "fix_idea": "Run the same synthesis agent (R5) on the review-only path: feed it the reviewer outputs, get back a de-duplicated, severity-ranked digest, and return THAT as `output`. If no synthesis agent is available, at least merge reviewers by file:line and order by severity before returning."
+  },
+  {
+    "severity": "minor",
+    "file": "frontend/src/lib/agent-engine/tools/workflow.ts",
+    "line": "112-117",
+    "bug": "The editor handoff prompt feeds the FULL `reviewReport` (unbounded, undeduped, including pool-full/stop fallback text from R2) to every editor. There is no structuring of findings into a numbered, addressable list — the editor-slicing instruction for >1 editor ('findings whose position modulo N equals i') operates on unnumbered Markdown prose and is unenforceable (inventory S8). Editors cannot reliably identify 'position', and the input may contain non-finding text ('The Reviewer pool is full.') that an editor may try to 'fix'.",
+    "why_it_bites": "The synthesis feed into Stage 2 is garbage-in/garbage-out. Editors receive a wall of overlapping, unnumbered, partially-fake findings and are told to slice it by position — a recipe for both fixing the same thing twice and skipping real findings. The handoff is the place where poor upstream synthesis compounds into poor downstream action.",
+    "fix_idea": "Before Stage 2, structure the review into a numbered, deduped findings list (id, file:line, severity, description) — exactly the output of the R5 synthesis agent. Feed editors THAT list, so 'position modulo N' is well-defined and non-finding text is excluded. Reject/flag findings with no parseable file:line."
+  }
+]
