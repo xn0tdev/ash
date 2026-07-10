@@ -1,6 +1,8 @@
 import { Message, NormalizedEvent } from "../types";
 import { Provider, StreamRequest } from "./provider";
 import { parseSSE } from "./sse";
+import { thinkingSpecForModelId, ThinkingSpec } from "../thinking-config";
+import type { ReasoningEffort } from "../../settings";
 
 // Our Message/ContentBlock shape mirrors Anthropic's wire format (tool
 // results live inside a "user" message). OpenAI wants each tool_use as a
@@ -68,17 +70,19 @@ export class OpenAICompatProvider implements Provider {
   ) {}
 
   async *streamChat(req: StreamRequest, signal: AbortSignal): AsyncGenerator<NormalizedEvent, void, unknown> {
+    // Resolve the per-model thinking spec so we send the RIGHT param for this
+    // model's family (enable_thinking for GLM, thinking object for Claude,
+    // reasoning_effort for OpenAI/Grok, etc.) instead of always reasoning_effort
+    // — which was a fake no-op on models that don't accept it.
+    const think: ThinkingSpec = thinkingSpecForModelId(req.model);
+    const thinkBody = think.encode((req.reasoningEffort ?? "auto") as ReasoningEffort);
+
     const body = {
       model: req.model,
       stream: true,
       max_tokens: req.maxTokens,
       messages: [{ role: "system", content: req.system }, ...toOpenAIMessages(req.messages, req.supportsImages ?? false)],
-      // Map straight to the API's reasoning_effort ("none" disables thinking,
-      // "low"/"medium"/"high"/"max" set depth — verified on Fireworks GLM-5.2).
-      // "auto"/unset sends nothing so the model uses its native default.
-      ...(req.reasoningEffort && req.reasoningEffort !== "auto"
-        ? { reasoning_effort: req.reasoningEffort }
-        : {}),
+      ...thinkBody,
       ...(req.tools.length
         ? {
             tools: req.tools.map((t) => ({
@@ -126,11 +130,16 @@ export class OpenAICompatProvider implements Provider {
 
       if (typeof delta.content === "string" && delta.content)
         yield { type: "text_delta", text: delta.content };
-      // Some OpenAI-compatible providers (e.g. reasoning models on Fireworks)
-      // stream a separate reasoning_content field — surfaced distinctly so
-      // the UI can render it like a thought, not final prose.
-      if (typeof delta.reasoning_content === "string" && delta.reasoning_content)
-        yield { type: "thought_delta", text: delta.reasoning_content };
+      // Thought content — check every field the model's family spec lists
+      // (reasoning_content for OpenAI-compat, thinking for Claude/GLM, etc.)
+      // so thoughts surface as thought_delta regardless of the field name.
+      for (const field of think.streamFields) {
+        const val = (delta as Record<string, unknown>)[field];
+        if (typeof val === "string" && val) {
+          yield { type: "thought_delta", text: val };
+          break; // one field carries it — don't double-emit
+        }
+      }
 
       if (Array.isArray(delta.tool_calls)) {
         for (const tc of delta.tool_calls) {

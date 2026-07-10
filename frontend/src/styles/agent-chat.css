@@ -4,6 +4,18 @@
   flex-direction: column;
   overflow: hidden;
   padding: 0;
+  /* Smooth fade-in on mount so the agent pane doesn't pop in after its lazy
+     chunk loads + the system prompt resolves — eases in over ~0.25s, reading
+     as the pane arriving rather than a flash of empty content. */
+  animation: agentPaneIn 0.25s ease;
+}
+@keyframes agentPaneIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 /* no hairline ring around the chat pane (terminals/browser keep theirs) */
 .pane.agent-pane {
