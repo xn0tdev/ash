@@ -521,7 +521,8 @@
   margin: 5px 0;
   min-height: 21px;
   font-size: 13.5px;
-  /* text after the icon matches the "Thought" label colour */
+  /* settled tools: icon + title share one constant tone so they never
+     desync between white/grey. */
   color: var(--faint);
   white-space: nowrap;
   overflow: hidden;
@@ -531,11 +532,11 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* running: title breathes via opacity (GPU-composited) — the old
-   background-position + background-clip:text shimmer forced a main-thread
-   repaint every frame for the whole tool call, competing with the stream */
-.chat-tool.s-pending .chat-tool-title,
-.chat-tool.s-in_progress .chat-tool-title {
+/* running: the WHOLE row (icon + title together) breathes via opacity so
+   they stay the same tone on every frame — previously only the title pulsed
+   while the icon stayed fixed, so they read as white-vs-grey mid-call. */
+.chat-tool.s-pending,
+.chat-tool.s-in_progress {
   animation: chatShimmer 1.5s ease-in-out infinite;
 }
 .chat-tool.s-failed {
@@ -626,7 +627,7 @@
 @keyframes chatShimmer {
   0%,
   100% {
-    opacity: 0.55;
+    opacity: 0.7;
   }
   50% {
     opacity: 1;
