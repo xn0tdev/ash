@@ -715,7 +715,7 @@ export default function Sidebar({
         ref={scrollRef}
       >
         <div className="side-header workspaces-header">
-          <span className="side-header-title">Workspaces</span>
+          <span>Workspaces</span>
           <span className="side-header-actions">
             <button
               className={`side-add workspaces-collapse${workspacesOpen ? "" : " closed"}`}
