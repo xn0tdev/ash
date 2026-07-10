@@ -15,6 +15,7 @@
   flex-direction: column;
   padding: 16px 12px;
   overflow-y: auto;
+  background: var(--bg);
 }
 
 .settings-back {
@@ -73,7 +74,7 @@
 }
 
 .nav-item.active {
-  background: var(--surface);
+  background: var(--hover);
   color: var(--text);
 }
 
@@ -81,6 +82,11 @@
   flex: 1;
   min-width: 0;
   overflow-y: auto;
+  /* Separate the actual settings canvas from the left navigation without a
+     hard divider/border — just a quiet surface shift and a large inner radius. */
+  background: color-mix(in srgb, var(--surface) 86%, var(--bg));
+  border-radius: 24px 0 0 24px;
+  corner-shape: squircle;
 }
 /* custom slim scrollbar — a thin floating pill inset from the edge */
 .settings-content::-webkit-scrollbar {
@@ -186,14 +192,12 @@
   padding: 0 10px 0 12px;
   border-radius: 12px;
   corner-shape: squircle;
-  background: color-mix(in srgb, var(--surface) 72%, var(--raise));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border) 72%, transparent);
+  background: color-mix(in srgb, var(--raise) 72%, var(--surface));
   color: var(--faint);
 }
 
 .settings-search:focus-within {
   color: var(--muted);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border) 100%, var(--text) 10%);
 }
 
 .settings-search input {
@@ -234,8 +238,8 @@
   padding: 6px;
   border-radius: 14px;
   corner-shape: squircle;
-  background: color-mix(in srgb, var(--surface) 90%, var(--raise));
-  box-shadow: 0 18px 44px color-mix(in srgb, var(--shadow) 26%, transparent), inset 0 0 0 1px var(--border);
+  background: color-mix(in srgb, var(--raise) 82%, var(--surface));
+  box-shadow: 0 18px 44px color-mix(in srgb, var(--shadow) 26%, transparent);
   animation: settingsSearchIn 0.14s ease;
 }
 
