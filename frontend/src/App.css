@@ -72,9 +72,11 @@
   color: var(--text);
 }
 
+/* close (X) follows the same hover treatment as the others — color only, no
+   red fill (kept the .wc-close hook in case we want it back later). */
 .wc-close:hover {
-  background: #cf4b47;
-  color: #fff;
+  background: transparent;
+  color: var(--text);
 }
 
 /* terminal pane */
