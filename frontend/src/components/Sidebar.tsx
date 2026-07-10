@@ -569,18 +569,18 @@ export default function Sidebar({
     pinned.filter((p) => p.type === "tab").map((p) => p.id),
   );
 
-  const projectIds = workspaces
-    .filter((ws) => tabs.some((t) => t.workspaceId === ws.id && !pinnedTabIds.has(t.id)))
-    .map((ws) => ws.id);
-  const allProjectsCollapsed =
-    projectIds.length > 0 && projectIds.every((id) => collapsedWs.has(id));
-  const toggleAllProjects = () => {
-    setCollapsedWs((prev) => {
-      const next = new Set(prev);
-      if (allProjectsCollapsed) projectIds.forEach((id) => next.delete(id));
-      else projectIds.forEach((id) => next.add(id));
+  const [workspacesOpen, setWorkspacesOpen] = useState(() => {
+    try {
+      return localStorage.getItem("ash.workspacesOpen") !== "0";
+    } catch {
+      return true;
+    }
+  });
+  const toggleWorkspacesOpen = () => {
+    setWorkspacesOpen((open) => {
+      const next = !open;
       try {
-        localStorage.setItem("ash.wsCollapsed", JSON.stringify([...next]));
+        localStorage.setItem("ash.workspacesOpen", next ? "1" : "0");
       } catch {
         // best-effort persistence
       }
@@ -714,14 +714,14 @@ export default function Sidebar({
         className={`side-scroll${canUp ? " can-up" : ""}${canDown ? " can-down" : ""}`}
         ref={scrollRef}
       >
-        <div className="side-header projects-header">
-          <span className="side-header-title">Projects</span>
+        <div className="side-header workspaces-header">
+          <span className="side-header-title">Workspaces</span>
           <span className="side-header-actions">
             <button
-              className={`side-add project-collapse${allProjectsCollapsed ? " closed" : ""}`}
-              title={allProjectsCollapsed ? "Expand all projects" : "Collapse all projects"}
-              onClick={toggleAllProjects}
-              disabled={projectIds.length === 0}
+              className={`side-add workspaces-collapse${workspacesOpen ? "" : " closed"}`}
+              title={workspacesOpen ? "Hide workspaces" : "Show workspaces"}
+              onClick={toggleWorkspacesOpen}
+              disabled={workspaces.length === 0}
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="6 9 12 15 18 9" />
@@ -777,7 +777,7 @@ export default function Sidebar({
           </>
         )}
 
-        {workspaces.map((ws) => {
+        {workspacesOpen && workspaces.map((ws) => {
           const wsTabs = tabs.filter(
             (t) => t.workspaceId === ws.id && !pinnedTabIds.has(t.id),
           );
