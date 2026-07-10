@@ -190,8 +190,8 @@
 .setting-restore {
   display: grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   border: none;
   border-radius: 8px;
   corner-shape: squircle;
