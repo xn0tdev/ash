@@ -236,26 +236,26 @@ const CATEGORIES = [
 
 type CategoryId = (typeof CATEGORIES)[number]["id"];
 
-const SETTING_SEARCH_ITEMS: { cat: CategoryId; label: string; hint: string; keywords?: string }[] = [
-  { cat: "appearance", label: "Theme", hint: "Colors for the whole app and terminal", keywords: "color dark light" },
-  { cat: "appearance", label: "Light mode", hint: "Use the theme's white variant", keywords: "white bright" },
-  { cat: "appearance", label: "Interface scale", hint: "Zoom the whole UI", keywords: "ui size zoom percent" },
-  { cat: "appearance", label: "Terminal font", hint: "Font family for terminal text", keywords: "mono geist jetbrains fira ibm plex source code inconsolata space martian" },
-  { cat: "appearance", label: "Font size", hint: "Terminal font size", keywords: "ctrl plus minus" },
-  { cat: "layout", label: "Explorer side", hint: "File tree position", keywords: "files sidebar left right" },
-  { cat: "sections", label: "Commands", hint: "Quick-launch commands section", keywords: "sidebar quick launch" },
-  { cat: "sections", label: "Agents", hint: "Detected CLI agents section", keywords: "claude codex sidebar" },
-  { cat: "sections", label: "SSH", hint: "SSH hosts section", keywords: "hosts config remote" },
-  { cat: "terminal", label: "Padding", hint: "Space between the app surface and terminal grid", keywords: "gap inset spacing пробел отступ" },
-  { cat: "terminal", label: "Corner radius", hint: "Rounding of terminal pane corners", keywords: "round radius скругление" },
-  { cat: "terminal", label: "Clear on exit", hint: "Wipe chats or terminals when the app quits", keywords: "reset delete cleanup quit close" },
-  { cat: "agents", label: "Permission mode", hint: "Confirm risky actions or full auto", keywords: "approval bash file edits" },
-  { cat: "agents", label: "Sound", hint: "Chime when a task finishes or needs approval", keywords: "audio notification ding" },
-  { cat: "agents", label: "Notifications", hint: "System notification when the window isn’t focused", keywords: "toast alert" },
-  { cat: "agents", label: "Providers", hint: "OpenAI-compatible endpoints", keywords: "api base url key openrouter fireworks" },
-  { cat: "agents", label: "Models", hint: "Active model, context window, vision and fast variant", keywords: "glm grok claude gpt gemini reasoning context" },
-  { cat: "shortcuts", label: "Shortcuts", hint: "Keyboard shortcuts", keywords: "hotkeys keybindings ctrl alt" },
-  { cat: "about", label: "Reset everything", hint: "Delete chats and reset app data", keywords: "factory default wipe" },
+const SETTING_SEARCH_ITEMS: { key: string; cat: CategoryId; label: string; hint: string; keywords?: string }[] = [
+  { key: "theme", cat: "appearance", label: "Theme", hint: "Colors for the whole app and terminal", keywords: "color dark light" },
+  { key: "themeLight", cat: "appearance", label: "Light mode", hint: "Use the theme's white variant", keywords: "white bright" },
+  { key: "uiScale", cat: "appearance", label: "Interface scale", hint: "Zoom the whole UI", keywords: "ui size zoom percent" },
+  { key: "font", cat: "appearance", label: "Terminal font", hint: "Font family for terminal text", keywords: "mono geist jetbrains fira ibm plex source code inconsolata space martian" },
+  { key: "fontSize", cat: "appearance", label: "Font size", hint: "Terminal font size", keywords: "ctrl plus minus" },
+  { key: "explorerSide", cat: "layout", label: "Explorer side", hint: "File tree position", keywords: "files sidebar left right" },
+  { key: "sections.commands", cat: "sections", label: "Commands", hint: "Quick-launch commands section", keywords: "sidebar quick launch" },
+  { key: "sections.agents", cat: "sections", label: "Agents", hint: "Detected CLI agents section", keywords: "claude codex sidebar" },
+  { key: "sections.ssh", cat: "sections", label: "SSH", hint: "SSH hosts section", keywords: "hosts config remote" },
+  { key: "termPad", cat: "terminal", label: "Padding", hint: "Space between the app surface and terminal grid", keywords: "gap inset spacing пробел отступ" },
+  { key: "termRadius", cat: "terminal", label: "Corner radius", hint: "Rounding of terminal pane corners", keywords: "round radius скругление" },
+  { key: "clearOnExit", cat: "terminal", label: "Clear on exit", hint: "Wipe chats or terminals when the app quits", keywords: "reset delete cleanup quit close" },
+  { key: "engine.permissionMode", cat: "agents", label: "Permission mode", hint: "Confirm risky actions or full auto", keywords: "approval bash file edits" },
+  { key: "engine.sounds", cat: "agents", label: "Sound", hint: "Chime when a task finishes or needs approval", keywords: "audio notification ding" },
+  { key: "engine.notifications", cat: "agents", label: "Notifications", hint: "System notification when the window isn’t focused", keywords: "toast alert" },
+  { key: "providers", cat: "agents", label: "Providers", hint: "OpenAI-compatible endpoints", keywords: "api base url key openrouter fireworks" },
+  { key: "models", cat: "agents", label: "Models", hint: "Active model, context window, vision and fast variant", keywords: "glm grok claude gpt gemini reasoning context" },
+  { key: "shortcuts", cat: "shortcuts", label: "Shortcuts", hint: "Keyboard shortcuts", keywords: "hotkeys keybindings ctrl alt" },
+  { key: "reset", cat: "about", label: "Reset everything", hint: "Delete chats and reset app data", keywords: "factory default wipe" },
 ];
 
 function RestoreButton({
@@ -307,6 +307,9 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
   const [settings, setSettings] = useState<Settings>(getSettings());
   const [cat, setCat] = useState<CategoryId>("appearance");
   const [search, setSearch] = useState("");
+  const [searchActive, setSearchActive] = useState(false);
+  const [searchIndex, setSearchIndex] = useState(0);
+  const [highlightKey, setHighlightKey] = useState<string | null>(null);
   const [resetOpen, setResetOpen] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [modelEdit, setModelEdit] = useState<EngineModel | null>(null);
@@ -521,9 +524,22 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
           .includes(searchQuery),
       )
     : [];
-  const jumpToSearchResult = (nextCat: CategoryId) => {
-    setCat(nextCat);
+  const visibleSearchResults = searchResults.slice(0, 8);
+  useEffect(() => setSearchIndex(0), [searchQuery]);
+  const jumpToSearchResult = (item: (typeof SETTING_SEARCH_ITEMS)[number]) => {
+    setCat(item.cat);
     setSearch("");
+    setSearchActive(false);
+    setHighlightKey(item.key);
+    window.setTimeout(() => setHighlightKey((cur) => (cur === item.key ? null : cur)), 1200);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        document.querySelector(`[data-setting-key="${item.key}"]`)?.scrollIntoView({
+          block: "center",
+          behavior: "smooth",
+        });
+      });
+    });
   };
 
   return (
@@ -566,26 +582,38 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search settings…"
                   spellCheck={false}
+                  onFocus={() => setSearchActive(true)}
                   onKeyDown={(e) => {
                     if (e.key === "Escape" && search) {
                       e.stopPropagation();
                       setSearch("");
+                      setSearchActive(false);
+                    } else if (e.key === "ArrowDown" && visibleSearchResults.length) {
+                      e.preventDefault();
+                      setSearchActive(true);
+                      setSearchIndex((i) => Math.min(visibleSearchResults.length - 1, i + 1));
+                    } else if (e.key === "ArrowUp" && visibleSearchResults.length) {
+                      e.preventDefault();
+                      setSearchIndex((i) => Math.max(0, i - 1));
+                    } else if (e.key === "Enter" && visibleSearchResults[searchIndex]) {
+                      e.preventDefault();
+                      jumpToSearchResult(visibleSearchResults[searchIndex]);
                     }
                   }}
                 />
                 {search && (
-                  <button type="button" className="settings-search-clear" onClick={() => setSearch("")} aria-label="Clear search">
+                  <button type="button" className="settings-search-clear" onClick={() => { setSearch(""); setSearchActive(false); }} aria-label="Clear search">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
                       <path d="M18 6 6 18M6 6l12 12" />
                     </svg>
                   </button>
                 )}
               </div>
-              {searchQuery && (
+              {searchQuery && searchActive && (
                 <div className="settings-search-results">
-                  {searchResults.length ? (
-                    searchResults.map((item) => (
-                      <button key={`${item.cat}:${item.label}`} type="button" className="settings-search-result" onClick={() => jumpToSearchResult(item.cat)}>
+                  {visibleSearchResults.length ? (
+                    visibleSearchResults.map((item, i) => (
+                      <button key={`${item.cat}:${item.label}`} type="button" className={`settings-search-result${i === searchIndex ? " active" : ""}`} onMouseEnter={() => setSearchIndex(i)} onClick={() => jumpToSearchResult(item)}>
                         <span className="settings-search-result-main">
                           <span>{item.label}</span>
                           <small>{item.hint}</small>
@@ -604,7 +632,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
             {cat === "appearance" && (
               <section>
                 <h3>Appearance</h3>
-                <div className="setting-row">
+                <div className={`setting-row${highlightKey === "theme" ? " setting-highlight" : ""}`} data-setting-key="theme">
                   <div className="setting-info">
                     <label>Theme</label>
                     <span className="setting-hint">
@@ -623,7 +651,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                     />
                   </div>
                 </div>
-                <div className="setting-row">
+                <div className={`setting-row${highlightKey === "themeLight" ? " setting-highlight" : ""}`} data-setting-key="themeLight">
                   <div className="setting-info">
                     <label>Light mode</label>
                     <span className="setting-hint">
@@ -641,7 +669,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                     />
                   </div>
                 </div>
-                <div className="setting-row">
+                <div className={`setting-row${highlightKey === "uiScale" ? " setting-highlight" : ""}`} data-setting-key="uiScale">
                   <div className="setting-info">
                     <label>Interface scale</label>
                     <span className="setting-hint">
@@ -667,7 +695,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                     />
                   </div>
                 </div>
-                <div className="setting-row">
+                <div className={`setting-row${highlightKey === "font" ? " setting-highlight" : ""}`} data-setting-key="font">
                   <div className="setting-info">
                     <label>Terminal font</label>
                     <span className="setting-hint">
@@ -686,7 +714,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                     />
                   </div>
                 </div>
-                <div className="setting-row">
+                <div className={`setting-row${highlightKey === "fontSize" ? " setting-highlight" : ""}`} data-setting-key="fontSize">
                   <div className="setting-info">
                     <label>Font size</label>
                     <span className="setting-hint">Ctrl+= / Ctrl+- / Ctrl+0</span>
@@ -710,7 +738,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
             {cat === "layout" && (
               <section>
                 <h3>Layout</h3>
-                <div className="setting-row">
+                <div className={`setting-row${highlightKey === "explorerSide" ? " setting-highlight" : ""}`} data-setting-key="explorerSide">
                   <div className="setting-info">
                     <label>Explorer side</label>
                     <span className="setting-hint">
@@ -734,7 +762,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
             {cat === "sections" && (
               <section>
                 <h3>Sidebar sections</h3>
-                <div className="setting-row">
+                <div className={`setting-row${highlightKey === "sections.commands" ? " setting-highlight" : ""}`} data-setting-key="sections.commands">
                   <div className="setting-info">
                     <label>Commands</label>
                     <span className="setting-hint">Quick-launch commands</span>
@@ -744,7 +772,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                     onChange={(v) => applySection("commands", v)}
                   />
                 </div>
-                <div className="setting-row">
+                <div className={`setting-row${highlightKey === "sections.agents" ? " setting-highlight" : ""}`} data-setting-key="sections.agents">
                   <div className="setting-info">
                     <label>Agents</label>
                     <span className="setting-hint">
@@ -756,7 +784,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                     onChange={(v) => applySection("agents", v)}
                   />
                 </div>
-                <div className="setting-row">
+                <div className={`setting-row${highlightKey === "sections.ssh" ? " setting-highlight" : ""}`} data-setting-key="sections.ssh">
                   <div className="setting-info">
                     <label>SSH</label>
                     <span className="setting-hint">
@@ -774,7 +802,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
             {cat === "terminal" && (
               <section>
                 <h3>Terminal</h3>
-                <div className="setting-row">
+                <div className={`setting-row${highlightKey === "termPad" ? " setting-highlight" : ""}`} data-setting-key="termPad">
                   <div className="setting-info">
                     <label>Padding</label>
                     <span className="setting-hint">
@@ -794,7 +822,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                     />
                   </div>
                 </div>
-                <div className="setting-row">
+                <div className={`setting-row${highlightKey === "termRadius" ? " setting-highlight" : ""}`} data-setting-key="termRadius">
                   <div className="setting-info">
                     <label>Corner radius</label>
                     <span className="setting-hint">Rounding of the terminal pane corners</span>
@@ -812,7 +840,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                     />
                   </div>
                 </div>
-                <div className="setting-row">
+                <div className={`setting-row${highlightKey === "clearOnExit" ? " setting-highlight" : ""}`} data-setting-key="clearOnExit">
                   <div className="setting-info">
                     <label>Clear on exit</label>
                     <span className="setting-hint">
@@ -843,7 +871,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
             {cat === "agents" && (
               <section>
                 <h3>Agents</h3>
-                <div className="setting-row">
+                <div className={`setting-row${highlightKey === "engine.permissionMode" ? " setting-highlight" : ""}`} data-setting-key="engine.permissionMode">
                   <div className="setting-info">
                     <label>Permission mode</label>
                     <span className="setting-hint">
@@ -867,7 +895,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                     ]}
                   />
                 </div>
-                <div className="setting-row">
+                <div className={`setting-row${highlightKey === "engine.sounds" ? " setting-highlight" : ""}`} data-setting-key="engine.sounds">
                   <div className="setting-info">
                     <label>Sound</label>
                     <span className="setting-hint">
@@ -881,7 +909,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                     }
                   />
                 </div>
-                <div className="setting-row">
+                <div className={`setting-row${highlightKey === "engine.notifications" ? " setting-highlight" : ""}`} data-setting-key="engine.notifications">
                   <div className="setting-info">
                     <label>Notifications</label>
                     <span className="setting-hint">
@@ -895,7 +923,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                     }
                   />
                 </div>
-                <div className="setting-row stack">
+                <div className={`setting-row stack${highlightKey === "providers" ? " setting-highlight" : ""}`} data-setting-key="providers">
                   <div className="setting-info">
                     <label>Providers</label>
                     <span className="setting-hint">
@@ -960,7 +988,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                   </div>
                 </div>
 
-                <div className="setting-row stack">
+                <div className={`setting-row stack${highlightKey === "models" ? " setting-highlight" : ""}`} data-setting-key="models">
                   <div className="setting-info">
                     <label>Models{activeProv ? ` · ${activeProv.name}` : ""}</label>
                     <span className="setting-hint">
@@ -1055,7 +1083,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
             {cat === "shortcuts" && (
               <section>
                 <h3>Shortcuts</h3>
-                <div className="shortcut-grid">
+                <div className={`shortcut-grid${highlightKey === "shortcuts" ? " setting-highlight" : ""}`} data-setting-key="shortcuts">
                   <span>New tab</span><kbd>Ctrl+Shift+T</kbd>
                   <span>Close pane</span><kbd>Ctrl+Shift+W</kbd>
                   <span>Split right</span><kbd>Ctrl+Shift+D</kbd>
@@ -1077,7 +1105,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                   Ash 0.2.4 — minimal agentic terminal.
                 </div>
 
-                <div className="setting-row stack">
+                <div className={`setting-row stack${highlightKey === "reset" ? " setting-highlight" : ""}`} data-setting-key="reset">
                   <div className="setting-info">
                     <label>Reset everything</label>
                     <span className="setting-hint">
