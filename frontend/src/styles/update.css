@@ -1,39 +1,25 @@
-/* Update badge — icon-only pill at the end of the titlebar (after the window
-   controls). Monochrome to match the app's palette; a soft pulse draws the
-   eye without a loud color. Capsule shape = fully rounded. */
+/* Update badge — text "Update" in blue, sits before the title in the
+   titlebar. No icon, no animation; just a quiet colored call to action. */
 .update-badge {
   flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  margin-left: 6px;
+  height: 22px;
+  padding: 0 10px;
+  margin-right: 8px;
   border: none;
-  border-radius: 999px; /* full capsule */
-  background: var(--raise);
-  color: var(--text);
+  border-radius: 7px;
+  corner-shape: squircle;
+  background: transparent;
+  color: #4d8dff;
+  font: 500 12px/1 "Inter", sans-serif;
+  letter-spacing: 0.01em;
   cursor: default;
-  transition: filter 0.12s ease, transform 0.12s ease;
-  animation: updateBadgePop 0.22s ease;
+  transition: background-color 0.1s ease;
 }
 .update-badge:hover {
-  filter: brightness(1.2);
+  background: var(--hover);
 }
 .update-badge:active {
-  transform: translateY(1px);
-}
-/* gentle pulse so a pending update is noticed without a loud color */
-.update-badge svg {
-  animation: updatePulse 2.4s ease-in-out infinite;
-}
-@keyframes updateBadgePop {
-  from { opacity: 0; transform: translateY(-2px) scale(0.96); }
-  to   { opacity: 1; transform: none; }
-}
-@keyframes updatePulse {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: 0.45; }
+  filter: brightness(0.94);
 }
 .mac .update-badge { display: none; } /* mac reserves top-left for traffic lights */
 

@@ -63,6 +63,16 @@ export default function TitleBar({
       className={`main-head${sidebarOpen ? "" : " with-toggle"}`}
       data-tauri-drag-region
     >
+      {showUpdateBadge && (
+        <button
+          className="update-badge"
+          title="A new version of Ash is available"
+          onClick={onUpdate}
+          data-tauri-drag-region={false}
+        >
+          Update
+        </button>
+      )}
       <span className="head-title" data-tauri-drag-region>
         {title}
       </span>
@@ -122,18 +132,6 @@ export default function TitleBar({
             </svg>
           </button>
         </div>
-        )}
-        {showUpdateBadge && (
-          <button
-            className="update-badge"
-            title="A new version of Ash is available"
-            onClick={onUpdate}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 12a9 9 0 1 1-2.64-6.36" />
-              <path d="M21 3v6h-6" />
-            </svg>
-          </button>
         )}
       </div>
     </header>
