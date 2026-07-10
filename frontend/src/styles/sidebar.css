@@ -182,58 +182,6 @@
   color: var(--text);
 }
 
-.side-filter {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin: 0 4px 6px;
-  padding: 0 8px 0 9px;
-  height: 30px;
-  border-radius: 10px;
-  corner-shape: squircle;
-  background: var(--hover);
-  color: var(--faint);
-  flex-shrink: 0;
-}
-
-.side-filter > svg {
-  flex-shrink: 0;
-}
-
-.side-filter input {
-  flex: 1;
-  min-width: 0;
-  border: none;
-  background: transparent;
-  color: var(--text);
-  font-size: 12.5px;
-  font-family: inherit;
-  outline: none;
-}
-
-.side-filter input::placeholder {
-  color: var(--faint);
-}
-
-.side-filter-clear {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--faint);
-  cursor: default;
-  flex-shrink: 0;
-}
-
-.side-filter-clear:hover {
-  color: var(--text);
-  background: rgba(255, 255, 255, 0.08);
-}
-
 .ws-diff {
   display: inline-flex;
   align-items: center;

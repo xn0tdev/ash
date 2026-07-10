@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 import { PinnedItem, SshHost, Tab, Utility, Workspace } from "../App";
@@ -58,7 +58,7 @@ import {
   FolderIcon, FolderOpenIcon, BranchIcon, ServerIcon, TerminalIcon, FileTabIcon,
   WebTabIcon, PinIcon, AgentTabIcon, NewAgentIcon, AgentWorkingIcon,
   AgentDoneIcon, SessionTermIcon, BotIcon, CommandIcon, PlusIcon,
-  FilterIcon, AgentDoneChatIcon, BroomIcon, CloseSquareIcon, XIcon, GearIcon, NewTabIcon,
+  AgentDoneChatIcon, BroomIcon, CloseSquareIcon, GearIcon, NewTabIcon,
   SearchIcon,
 } from "./sidebar/icons";
 
@@ -175,8 +175,6 @@ export default function Sidebar({
     y: number;
   } | null>(null);
   const [dropWs, setDropWs] = useState<string | null>(null);
-  const [filterOpen, setFilterOpen] = useState(false);
-  const [filter, setFilter] = useState("");
   const [diff, setDiff] = useState<{ added: number; removed: number } | null>(
     null,
   );
@@ -250,9 +248,6 @@ export default function Sidebar({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeWorkspaceId, branch]);
-
-  const q = filter.trim().toLowerCase();
-  const tabMatch = (t: Tab) => !q || t.title.toLowerCase().includes(q);
 
   const resolvePin = (p: PinnedItem) => {
     if (p.type === "workspace") {
@@ -583,13 +578,6 @@ export default function Sidebar({
       !leaves(t.root).some((l) => l.kind === "agent" && l.agentId.startsWith("bg:")) &&
       (!t.workspaceId || !workspaces.some((w) => w.id === t.workspaceId)),
   );
-  // memoized so the render path below doesn't filter looseTabs twice per
-  // keystroke (once for the emptiness test, once for the map)
-  const filteredLoose = useMemo(
-    () => looseTabs.filter(tabMatch),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [looseTabs, q],
-  );
 
   return (
     <aside className="sidebar">
@@ -718,18 +706,6 @@ export default function Sidebar({
               <BroomIcon />
             </button>
             <button
-              className={`side-add${filterOpen ? " on" : ""}`}
-              title="Filter terminals"
-              onClick={() => {
-                setFilterOpen((o) => {
-                  if (o) setFilter("");
-                  return !o;
-                });
-              }}
-            >
-              <FilterIcon />
-            </button>
-            <button
               className="side-add"
               title="Add workspace"
               onClick={(e) => {
@@ -742,32 +718,6 @@ export default function Sidebar({
           </span>
         </div>
 
-        {filterOpen && (
-          <div className="side-filter">
-            <FilterIcon />
-            <input
-              autoFocus
-              value={filter}
-              placeholder="Filter terminals…"
-              onChange={(e) => setFilter(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") {
-                  setFilter("");
-                  setFilterOpen(false);
-                }
-              }}
-            />
-            {filter && (
-              <button
-                className="side-filter-clear"
-                title="Clear"
-                onClick={() => setFilter("")}
-              >
-                <XIcon />
-              </button>
-            )}
-          </div>
-        )}
 
         {wsMenu && (
           <>
@@ -802,12 +752,10 @@ export default function Sidebar({
           const wsTabs = tabs.filter(
             (t) => t.workspaceId === ws.id && !pinnedTabIds.has(t.id),
           );
-          const shownTabs = wsTabs.filter(tabMatch);
-          // While filtering, hide workspaces with no matching terminals.
-          if (q && shownTabs.length === 0) return null;
+          const shownTabs = wsTabs;
           // An empty workspace (no terminals) can't be opened; keep it closed.
           const isEmpty = wsTabs.length === 0;
-          const closed = (collapsedWs.has(ws.id) || isEmpty) && !q;
+          const closed = collapsedWs.has(ws.id) || isEmpty;
           return (
             <div key={ws.id} className="ws-group">
               <div
@@ -1080,11 +1028,11 @@ export default function Sidebar({
           </>
         )}
 
-        {filteredLoose.length > 0 && (
+        {looseTabs.length > 0 && (
           <>
             {/* no "Terminals" header — loose tabs are just separated by a gap */}
             <div className="loose-gap" />
-            {filteredLoose.map((t) => renderTab(t, false))}
+            {looseTabs.map((t) => renderTab(t, false))}
           </>
         )}
       </div>
