@@ -8,15 +8,16 @@
 
 <!-- TODO: drop a hero screenshot/demo GIF here once one exists — `![Ash](assets/hero.png)` -->
 
-Ash pairs a real ConPTY terminal with a provider-agnostic agent engine, so you can run shells and drive an agent in the same window. New terminals open in your home directory, sessions survive pane re-parenting, and the agent can run background shells, edit files, grep, glob, fetch the web, and spawn sub-workflows. Any OpenAI-compatible endpoint works as the backend.
+Ash pairs a real terminal with a provider-agnostic agent engine, so you can run shells and drive an agent in the same window. Any OpenAI-compatible endpoint works as the model backend; new terminals open in your home directory; sessions survive pane re-parenting; and updates land by swapping the binary in place — no installer needed.
 
 ## Features
 
-- **Real terminal** — ConPTY-backed xterm.js panes (pwsh/powershell/cmd auto-detected), splits, tabs, drag-to-workspace.
-- **Agent engine** — Anthropic-shaped wire types, OpenAI-compatible providers, streaming, tools, skills, roles, permissions.
-- **Workspaces** — bind a folder to a workspace; chats and terminals live there.
-- **Self-update** — checks GitHub Releases and swaps the binary in place, no installer needed.
-- **Frameless** — custom titlebar with Wails drag regions.
+- **Terminal + agent in one window** — run a real shell and drive an AI agent side by side; the agent can run commands, edit files, grep, glob, fetch the web, and spawn background shells you can read back later.
+- **New terminals open in your home dir** — not the app's install folder. Ctrl+V / Ctrl+Shift+V paste from anywhere, including dictation apps like Wispr Flow.
+- **Workspaces that stick** — bind a folder to a workspace; chats and terminals live there. Drag a tab onto a workspace and its terminal re-points to that folder, history intact.
+- **Any OpenAI-compatible model** — drop in your endpoint and key; the agent works with whatever provider you point it at.
+- **Self-updates by swapping the binary** — no installer, no admin prompt on the happy path. A blue Update button in the sidebar appears when a new release is out; click it and Ash restarts on the new version.
+- **Frameless, keyboard-driven** — splits, tabs, command palette, SSH launcher, run modal, all behind shortcuts (Ctrl+Shift+T new tab, Ctrl+K command palette, Ctrl+Shift+B toggle sidebar).
 
 ## Requirements
 
