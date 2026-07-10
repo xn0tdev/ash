@@ -566,21 +566,26 @@
   flex-shrink: 0;
 }
 /* models.dev provider logo in the model picker — inverted to a light monochrome
-   mark (the SVGs are fill="currentColor", i.e. black inside an <img>). Fades in
-   on mount so a logo that resolves a beat late (catalog still loading) doesn't
-   pop into view — it eases in over ~0.2s. */
+   mark (the SVGs are fill="currentColor", i.e. black inside an <img>). */
 .model-pick-logo {
   flex-shrink: 0;
   width: 17px;
   height: 17px;
   object-fit: contain;
   filter: grayscale(1) invert(1);
-  opacity: 0;
-  animation: modelLogoIn 0.22s ease forwards;
+  opacity: 0.7;
 }
-@keyframes modelLogoIn {
+/* Each option (logo + name) eases in together when the model picker opens, so
+   a logo that resolves a beat late doesn't pop in separately from its label. */
+.agent-menu button {
+  animation: modelOptIn 0.18s ease;
+}
+@keyframes modelOptIn {
+  from {
+    opacity: 0;
+  }
   to {
-    opacity: 0.7;
+    opacity: 1;
   }
 }
 .agent-hero .agent-composer {
