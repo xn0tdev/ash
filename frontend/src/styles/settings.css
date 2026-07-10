@@ -204,13 +204,23 @@
 }
 
 .setting-restore.show {
-  opacity: 0.55;
+  /* Present in layout but visually quiet until the row is hovered/focused —
+     avoids a column of restore icons constantly pulling the eye. */
+  opacity: 0;
+  transform: scale(0.96);
+  pointer-events: none;
+}
+
+.setting-row:hover .setting-restore.show,
+.setting-row:focus-within .setting-restore.show {
+  opacity: 0.52;
   transform: scale(1);
   pointer-events: auto;
 }
 
 .setting-restore.show:hover {
-  background: var(--hover);
+  /* Hover only changes color — no pill/background so it stays secondary. */
+  background: transparent;
   color: var(--text);
   opacity: 1;
 }
