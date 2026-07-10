@@ -1,7 +1,7 @@
 import { Message, NormalizedEvent } from "../types";
 import { Provider, StreamRequest } from "./provider";
 import { parseSSE } from "./sse";
-import { thinkingSpecForModelId, ThinkingSpec } from "../thinking-config";
+import { thinkingSpecForModel, ThinkingSpec, ThinkingFormat } from "../thinking-config";
 import type { ReasoningEffort } from "../../settings";
 
 // Our Message/ContentBlock shape mirrors Anthropic's wire format (tool
@@ -74,7 +74,7 @@ export class OpenAICompatProvider implements Provider {
     // model's family (enable_thinking for GLM, thinking object for Claude,
     // reasoning_effort for OpenAI/Grok, etc.) instead of always reasoning_effort
     // — which was a fake no-op on models that don't accept it.
-    const think: ThinkingSpec = thinkingSpecForModelId(req.model);
+    const think: ThinkingSpec = thinkingSpecForModel(req.model, req.thinkingFormat);
     const thinkBody = think.encode((req.reasoningEffort ?? "auto") as ReasoningEffort);
 
     const body = {

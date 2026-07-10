@@ -216,6 +216,7 @@ import {
   EngineModel,
   EngineProvider,
 } from "../lib/settings";
+import type { ThinkingFormat } from "../lib/agent-engine/thinking-config";
 import { resetAshData } from "../lib/chat-store";
 import { loadModelsDev, lookupModel, providerLogo, modelLogo } from "../lib/models-dev";
 import type { ModelInfo } from "../lib/models-dev";
@@ -1296,6 +1297,25 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                 </div>
 
                 {/* two boolean options share one row so the editor stays compact */}
+                <label className="model-field">
+                  <span>Thinking format</span>
+                  <Select
+                    value={modelEdit.thinkingFormat ?? "auto"}
+                    onChange={(v) =>
+                      setModelEdit({
+                        ...modelEdit,
+                        thinkingFormat: v === "auto" ? undefined : (v as ThinkingFormat),
+                      })
+                    }
+                    options={[
+                      { value: "auto", label: "Auto (family default)" },
+                      { value: "reasoning_effort", label: "reasoning_effort (OpenAI-compat)" },
+                      { value: "enable_thinking", label: "enable_thinking (GLM/Zhipu)" },
+                      { value: "thinking_object", label: "thinking object (Anthropic)" },
+                      { value: "native", label: "Native (no param)" },
+                    ]}
+                  />
+                </label>
                 <div className="model-toggles">
                   <label className="model-toggle-row">
                     <span>Fast variant</span>

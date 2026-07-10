@@ -62,18 +62,13 @@ const nativeThinking: ThinkingSpec = {
 };
 
 // ── family → spec registry ────────────────────────────────
-// Ordered longest-prefix-first where overlap exists. Matched case-insensitively
-// on `family === prefix` or `family.startsWith(prefix + "-")`.
+// DEFAULT is reasoning_effort — the most widely accepted shape across
+// OpenAI-compat proxies (Cursor backend, OpenRouter, Fireworks, …). Any model
+// whose specific endpoint needs a different shape (enable_thinking for raw
+// Zhipu, thinking object for raw Anthropic) can override it per-model in
+// Settings via EngineModel.thinkingFormat. The registry below is only the
+// fallback heuristic when a model has no explicit format set.
 const FAMILY_THINKING: { prefix: string; spec: ThinkingSpec }[] = [
-  // GLM — Zhipu uses enable_thinking natively; through OpenAI-compat proxies
-  // reasoning_effort is often forwarded too, but enable_thinking is the
-  // canonical shape that actually flips the model's thinking on/off.
-  { prefix: "glm", spec: enableThinking },
-
-  // Claude — Anthropic's thinking object; through compat proxies that forward
-  // it (OpenRouter etc.). Falls back to reasoning_content in the stream.
-  { prefix: "claude", spec: thinkingObject },
-
   // OpenAI o-series + GPT-5 — reasoning_effort is the native param.
   { prefix: "gpt", spec: reasoningEffort },
   { prefix: "o", spec: reasoningEffort },
@@ -89,9 +84,12 @@ const FAMILY_THINKING: { prefix: string; spec: ThinkingSpec }[] = [
   // Gemini — through compat proxies, reasoning_effort is typically forwarded.
   { prefix: "gemini", spec: reasoningEffort },
 
-  // Mistral / Qwen / Kimi / Minimax / Llama — reasoning_effort is the most
-  // widely accepted compat shape; if a model doesn't support it, the proxy
-  // ignores the unknown field rather than erroring.
+  // GLM / Claude / Mistral / Qwen / Kimi / Minimax / Llama — default to
+  // reasoning_effort (compat-safe). If a specific endpoint needs
+  // enable_thinking or the Anthropic thinking object, set it per-model in
+  // Settings > Agents > Models > Edit.
+  { prefix: "glm", spec: reasoningEffort },
+  { prefix: "claude", spec: reasoningEffort },
   { prefix: "mistral", spec: reasoningEffort },
   { prefix: "mixtral", spec: reasoningEffort },
   { prefix: "kimi", spec: reasoningEffort },
@@ -102,16 +100,21 @@ const FAMILY_THINKING: { prefix: string; spec: ThinkingSpec }[] = [
 
 const DEFAULT_SPEC = reasoningEffort;
 
-/** Resolve the thinking spec for a model family. Falls back to the OpenAI-compat
- *  default (reasoning_effort + reasoning_content) for unknown families. */
-export function thinkingSpecForFamily(family: string): ThinkingSpec {
-  const f = family.trim().toLowerCase();
-  if (f) {
-    for (const { prefix, spec } of FAMILY_THINKING) {
-      if (f === prefix || f.startsWith(prefix + "-")) return spec;
-    }
-  }
-  return DEFAULT_SPEC;
+/** Thinking format ids, stable for persistence in EngineModel.thinkingFormat. */
+export type ThinkingFormat = "reasoning_effort" | "enable_thinking" | "thinking_object" | "native";
+
+const FORMAT_SPEC: Record<ThinkingFormat, ThinkingSpec> = {
+  reasoning_effort: reasoningEffort,
+  enable_thinking: enableThinking,
+  thinking_object: thinkingObject,
+  native: nativeThinking,
+};
+
+/** Resolve the thinking spec from an explicit per-model format override, or
+ *  fall back to the family heuristic. */
+export function thinkingSpecForModel(modelId: string, format?: ThinkingFormat): ThinkingSpec {
+  if (format) return FORMAT_SPEC[format] ?? DEFAULT_SPEC;
+  return thinkingSpecForModelId(modelId);
 }
 
 /** Heuristic on a model id when the family isn't known yet (catalog not

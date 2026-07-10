@@ -1,4 +1,5 @@
 import { EnginePermissionMode, EngineProvider, getSettings, ReasoningEffort } from "../settings";
+import type { ThinkingFormat } from "./thinking-config";
 import { OpenAICompatProvider } from "./providers/openai-compat";
 import { Provider } from "./providers/provider";
 
@@ -9,6 +10,8 @@ export interface ResolvedEngineConfig {
   contextWindow: number;
   /** Whether the active model accepts image inputs. */
   supportsImages: boolean;
+  /** Per-model thinking format override (undefined = family heuristic). */
+  thinkingFormat?: ThinkingFormat;
   permissionMode: EnginePermissionMode;
   /** Default reasoning depth for a new session (UI can change it per-chat). */
   reasoningEffort: ReasoningEffort;
@@ -38,6 +41,7 @@ export function resolveEngineConfig(): ResolvedEngineConfig {
     model: s.useFast && active.fastId ? active.fastId : active.modelId,
     contextWindow: active.contextWindow,
     supportsImages: active.supportsImages,
+    thinkingFormat: active.thinkingFormat,
     permissionMode: s.permissionMode,
     reasoningEffort: s.reasoningEffort,
   };

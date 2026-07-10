@@ -1,4 +1,5 @@
 import { Message, NormalizedEvent, ToolSchema } from "../types";
+import type { ThinkingFormat } from "../thinking-config";
 
 export interface StreamRequest {
   model: string;
@@ -8,6 +9,8 @@ export interface StreamRequest {
   maxTokens: number;
   /** reasoning_effort to send; "auto" (or undefined) sends nothing. */
   reasoningEffort?: string;
+  /** Per-model thinking format override (undefined = family heuristic). */
+  thinkingFormat?: ThinkingFormat;
   /** When false, image blocks are stripped so a text-only model doesn't 400. */
   supportsImages?: boolean;
 }

@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { homeDir } from "@tauri-apps/api/path";
 import { toast } from "./toast";
 import { FONTS, THEMES, resolvedPreset } from "./themes";
+import type { ThinkingFormat } from "./agent-engine/thinking-config";
 // Re-exported so existing `from "./settings"` importers (SettingsModal) keep working.
 export { FONTS, THEMES };
 
@@ -35,6 +36,11 @@ export interface EngineModel {
   contextWindow: number;
   /** Whether the model accepts image inputs (else images are stripped). */
   supportsImages: boolean;
+  /** Per-model thinking/reasoning format override. When set, the provider sends
+   *  this shape instead of the family default — so a GLM on a proxy that only
+   *  accepts reasoning_effort can use that, while one on raw Zhipu can use
+   *  enable_thinking. Undefined = family heuristic (compat-safe default). */
+  thinkingFormat?: ThinkingFormat;
   /** models.dev provider logo URL, set when the model is auto-detected. */
   logo?: string;
 }
@@ -223,6 +229,7 @@ function normalizeModels(arr: any[]): EngineModel[] {
       fastId: m.fastId ? String(m.fastId) : undefined,
       contextWindow: Number(m.contextWindow) || 128_000,
       supportsImages: !!m.supportsImages,
+      thinkingFormat: m.thinkingFormat,
       logo: m.logo ? String(m.logo) : undefined,
     }));
 }

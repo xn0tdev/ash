@@ -136,6 +136,7 @@ async function runTurnInner(session: EngineSession): Promise<void> {
           maxTokens: MAX_TOKENS,
           reasoningEffort: session.reasoningEffort,
           supportsImages: session.config.supportsImages,
+          thinkingFormat: session.config.thinkingFormat,
         },
         session.signal,
       )) {
@@ -313,6 +314,7 @@ async function runTurnInner(session: EngineSession): Promise<void> {
         maxTokens: MAX_TOKENS,
         reasoningEffort: session.reasoningEffort,
         supportsImages: session.config.supportsImages,
+        thinkingFormat: session.config.thinkingFormat,
       },
       session.signal,
     )) {
