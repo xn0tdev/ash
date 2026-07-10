@@ -1,26 +1,33 @@
-/* Update badge — text "Update" in blue, sits before the title in the
-   titlebar. No icon, no animation; just a quiet colored call to action. */
+/* Update button — sits at the far left of the titlebar (where the sidebar
+   toggle lives), blue filled capsule with white "Update" text. No icon, no
+   animation. The title stays exactly where padding-left places it — the
+   button replaces the sidebar toggle's slot instead of pushing the title. */
 .update-badge {
-  flex-shrink: 0;
-  height: 22px;
-  padding: 0 10px;
-  margin-right: 8px;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  left: 8px;
+  height: 24px;
+  padding: 0 12px;
   border: none;
-  border-radius: 7px;
-  corner-shape: squircle;
-  background: transparent;
-  color: #4d8dff;
+  border-radius: 999px; /* capsule */
+  background: #2563eb;
+  color: #fff;
   font: 500 12px/1 "Inter", sans-serif;
   letter-spacing: 0.01em;
   cursor: default;
-  transition: background-color 0.1s ease;
+  transition: filter 0.12s ease;
+  z-index: 55;
 }
 .update-badge:hover {
-  background: var(--hover);
+  filter: brightness(1.12);
 }
 .update-badge:active {
   filter: brightness(0.94);
 }
+/* When an update is pending, hide the sidebar toggle so the button takes its
+   slot — the title (padding-left 44px with-toggle) is untouched. */
+.main-head.has-update .app-toggle { display: none; }
 .mac .update-badge { display: none; } /* mac reserves top-left for traffic lights */
 
 /* ── Update modal ─────────────────────────────────────────

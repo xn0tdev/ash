@@ -60,7 +60,7 @@ export default function TitleBar({
 
   return (
     <header
-      className={`main-head${sidebarOpen ? "" : " with-toggle"}`}
+      className={`main-head${sidebarOpen ? " with-toggle" : ""}${showUpdateBadge ? " has-update" : ""}`}
       data-tauri-drag-region
     >
       {showUpdateBadge && (
@@ -68,7 +68,6 @@ export default function TitleBar({
           className="update-badge"
           title="A new version of Ash is available"
           onClick={onUpdate}
-          data-tauri-drag-region={false}
         >
           Update
         </button>
