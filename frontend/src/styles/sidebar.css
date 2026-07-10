@@ -189,11 +189,22 @@
   min-width: 0;
 }
 
-.workspaces-title {
+.workspaces-title,
+.pinned-title {
   color: var(--text);
   font-size: 12.5px;
   font-weight: 400;
   letter-spacing: -0.01em;
+}
+
+.workspaces-action {
+  color: var(--text);
+  opacity: 0.72;
+}
+
+.workspaces-action:hover {
+  color: var(--text);
+  opacity: 1;
 }
 
 .workspaces-collapse {

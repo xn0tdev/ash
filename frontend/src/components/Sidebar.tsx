@@ -632,8 +632,8 @@ export default function Sidebar({
 
         <div className={`pinned-wrap${pinned.length > 0 || dragPin ? " open" : ""}`}>
           <div className="pinned-wrap-inner">
-            <div className="side-header">
-              <span>Pinned</span>
+            <div className="side-header pinned-header">
+              <span className="pinned-title">Pinned</span>
             </div>
             <div
               className={`pin-zone${dragPin ? " droppable" : ""}`}
@@ -730,14 +730,14 @@ export default function Sidebar({
           </span>
           <span className="side-header-actions">
             <button
-              className="side-add"
+              className="side-add workspaces-action"
               title="Close all terminals & chats"
               onClick={onCloseAll}
             >
               <BroomIcon />
             </button>
             <button
-              className="side-add"
+              className="side-add workspaces-action"
               title="Add workspace"
               onClick={(e) => {
                 const r = e.currentTarget.getBoundingClientRect();
