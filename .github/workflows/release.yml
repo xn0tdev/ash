@@ -43,12 +43,13 @@ jobs:
       - name: Add NSIS to PATH
         # choco installs NSIS to C:\Program Files (x86)\NSIS but doesn't
         # refresh PATH for subsequent steps in the same job — wails would
-        # still warn 'makensis not found'. Prepend it explicitly.
+        # still warn 'makensis not found'. Append it to GITHUB_PATH so the
+        # NEXT step (wails build) sees makensis on PATH. (Don't try to run
+        # makensis in THIS step — GITHUB_PATH only applies to later steps.)
         shell: pwsh
         run: |
           echo "C:\Program Files (x86)\NSIS" >> $env:GITHUB_PATH
-          makensis /VERSION
-          Write-Host "makensis on PATH"
+          Write-Host "NSIS added to PATH for subsequent steps"
 
       - name: Resolve version
         id: ver
