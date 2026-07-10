@@ -101,6 +101,16 @@
   height: 26px;
   pointer-events: none;
   background: linear-gradient(to top, var(--bg), transparent);
+  /* fade appears by alpha only while there's content below the fold; over a
+     short / fully-scrolled list it stays invisible instead of decorating. */
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+/* bottom melt shows while the scroll list can still go down. `.side-scroll` is
+   the sibling before `.side-footer`, so the general-sibling combinator reaches
+   the footer's ::before from the scroll container's state class. */
+.side-scroll.can-down ~ .side-footer::before {
+  opacity: 1;
 }
 
 /* Category header (Workspaces / Commands / …) — pinned to the top of the
@@ -135,6 +145,13 @@
   height: 14px;
   pointer-events: none;
   background: linear-gradient(to bottom, var(--bg), transparent);
+  /* top melt appears by alpha only once the list has scrolled down (rows slide
+     under the pinned header); at the very top it's invisible. */
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+.side-scroll.can-up .side-header::after {
+  opacity: 1;
 }
 
 .side-add {

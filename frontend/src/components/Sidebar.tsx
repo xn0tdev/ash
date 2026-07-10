@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 import { PinnedItem, SshHost, Tab, Utility, Workspace } from "../App";
@@ -180,6 +180,38 @@ export default function Sidebar({
   const [diff, setDiff] = useState<{ added: number; removed: number } | null>(
     null,
   );
+
+  // Edge fades: the header/footer gradients appear by alpha ONLY when the list
+  // can scroll that way — top melt shows once you've scrolled down (rows slide
+  // under the header), bottom melt shows while there's content below the fold.
+  // Without this the fades sit permanently even over a short, non-scrolling
+  // list and read as decoration, not a scroll affordance.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [canUp, setCanUp] = useState(false);
+  const [canDown, setCanDown] = useState(false);
+  const updateScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanUp(el.scrollTop > 0);
+    setCanDown(el.scrollHeight - el.scrollTop - el.clientHeight > 1);
+  };
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    updateScroll();
+    el.addEventListener("scroll", updateScroll, { passive: true });
+    // ResizeObserver covers window/pane resizes; MutationObserver covers rows
+    // being added/removed (scrollHeight changes without el itself resizing).
+    const ro = new ResizeObserver(updateScroll);
+    ro.observe(el);
+    const mo = new MutationObserver(updateScroll);
+    mo.observe(el, { childList: true, subtree: true });
+    return () => {
+      el.removeEventListener("scroll", updateScroll);
+      ro.disconnect();
+      mo.disconnect();
+    };
+  }, []);
 
   // Uncommitted +/- line stats for the active workspace's repo.
   useEffect(() => {
@@ -671,7 +703,10 @@ export default function Sidebar({
         </div>
       </div>
 
-      <div className="side-scroll">
+      <div
+        className={`side-scroll${canUp ? " can-up" : ""}${canDown ? " can-down" : ""}`}
+        ref={scrollRef}
+      >
         <div className="side-header">
           <span>Workspaces</span>
           <span className="side-header-actions">
