@@ -1,0 +1,36 @@
+:root {
+  color-scheme: dark;
+  --bg: #0a0a0a;
+  --surface: #151515;
+  --raise: #1e1e1e;
+  --border: rgba(255, 255, 255, 0.08);
+  --text: #ececec;
+  --muted: #a6a6a6;
+  --faint: #707070;
+  --hover: rgba(255, 255, 255, 0.055);
+
+  font-family: "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  font-size: 13px;
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-synthesis: none;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+*:focus,
+*:focus-visible {
+  outline: none;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  background: var(--bg);
+}

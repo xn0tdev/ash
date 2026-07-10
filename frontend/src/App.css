@@ -1,0 +1,91 @@
+/* Custom titlebar — frameless window, drag via --wails-draggable:drag.
+   Direct port of Ash's TitleBar.tsx (Tauri) → Wails: data-tauri-drag-region
+   becomes the --wails-draggable CSS var, window controls come from
+   @wailsio/runtime instead of @tauri-apps/api/window. */
+.main-head {
+  display: flex;
+  align-items: center;
+  height: 36px;
+  flex-shrink: 0;
+  padding: 0 8px 0 12px;
+  gap: 8px;
+  background: var(--bg);
+  -webkit-app-region: drag;
+}
+
+.head-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.head-spacer {
+  flex: 1;
+}
+
+.head-right {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.tb-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  cursor: default;
+  transition: background-color 0.1s ease, color 0.1s ease;
+}
+
+.tb-btn:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.wc-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: default;
+  transition: background-color 0.1s ease, color 0.1s ease;
+}
+
+.wc-btn:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.wc-close:hover {
+  background: #cf4b47;
+  color: #fff;
+}
+
+/* terminal pane */
+.term-container {
+  flex: 1;
+  min-height: 0;
+  padding: 8px;
+  background: var(--bg);
+}
+
+.term-container .xterm {
+  height: 100%;
+}
+
+.term-container .xterm-viewport {
+  background-color: transparent !important;
+}
