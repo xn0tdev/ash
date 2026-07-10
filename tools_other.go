@@ -23,7 +23,7 @@ func NewTools() *Tools { return &Tools{} }
 var toolsCtx context.Context
 
 func (Tools) DetectBins(names []string) []string {
-	var out []string
+	out := []string{}
 	for _, n := range names {
 		if _, err := exec.LookPath(n); err == nil {
 			out = append(out, n)
@@ -41,7 +41,7 @@ func (Tools) ResolveBash() string {
 
 func (Tools) FindEditors() []string {
 	names := []string{"code", "code-insiders", "cursor", "zed", "zed-dev", "windsurf"}
-	var found []string
+	found := []string{}
 	for _, n := range names {
 		if _, err := exec.LookPath(n); err == nil {
 			found = append(found, n)
@@ -59,7 +59,7 @@ func (Tools) SshHosts() []string {
 	if err != nil {
 		return nil
 	}
-	var hosts []string
+	hosts := []string{}
 	for _, line := range strings.Split(string(b), "\n") {
 		line = strings.TrimSpace(line)
 		if !strings.HasPrefix(strings.ToLower(line), "host ") {
@@ -73,7 +73,7 @@ func (Tools) SshHosts() []string {
 		}
 	}
 	sort.Strings(hosts)
-	out := hosts[:0]
+	out := []string{}
 	for i, h := range hosts {
 		if i == 0 || h != hosts[i-1] {
 			out = append(out, h)

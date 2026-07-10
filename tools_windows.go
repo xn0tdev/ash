@@ -25,9 +25,11 @@ func NewTools() *Tools { return &Tools{} }
 // (OpenFileDialog, MessageDialog, ClipboardGetText/SetText).
 var toolsCtx context.Context
 
-// DetectBins returns the subset of `names` that exist on PATH.
+// DetectBins returns the subset of `names` that exist on PATH. Always returns
+// a non-nil slice (empty = []); a nil slice would serialize to JSON `null` in
+// Wails and crash the frontend's .map (Tauri's Vec serializes to []).
 func (Tools) DetectBins(names []string) []string {
-	var out []string
+	out := []string{}
 	for _, n := range names {
 		if _, err := exec.LookPath(n); err == nil {
 			out = append(out, n)
@@ -66,7 +68,7 @@ func isSystemDir(dir string) bool {
 // (code, cursor, zed, …). The frontend lists these as "Open in…" actions.
 func (Tools) FindEditors() []string {
 	names := []string{"code", "code-insiders", "cursor", "zed", "zed-dev", "windsurf", "trae", "clave"}
-	var found []string
+	found := []string{}
 	for _, n := range names {
 		if _, err := exec.LookPath(n); err == nil {
 			found = append(found, n)
@@ -90,7 +92,9 @@ func (Tools) SshHosts() []string {
 	if err != nil {
 		return nil
 	}
-	var hosts []string
+	// Always return a non-nil slice (empty = []); nil would serialize to JSON
+	// `null` in Wails and crash the frontend's .map.
+	hosts := []string{}
 	for _, line := range strings.Split(string(b), "\n") {
 		line = strings.TrimSpace(line)
 		lower := strings.ToLower(line)
@@ -105,8 +109,8 @@ func (Tools) SshHosts() []string {
 		}
 	}
 	sort.Strings(hosts)
-	// dedup
-	out := hosts[:0]
+	// dedup into a non-nil slice (empty = [] not null).
+	out := []string{}
 	for i, h := range hosts {
 		if i == 0 || h != hosts[i-1] {
 			out = append(out, h)

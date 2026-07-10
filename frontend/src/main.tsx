@@ -1,5 +1,6 @@
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import ErrorBoundary from "./ErrorBoundary";
 import { applyAppTheme, applyUiScale, getSettings, loadSettings } from "./lib/settings";
 import { loadChats } from "./lib/chat-store";
 
@@ -155,7 +156,9 @@ async function start() {
 
   // No StrictMode: its double-mounted effects would spawn every PTY twice.
   ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
-    <App />,
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>,
   );
   } catch (e) {
     showError(e);
