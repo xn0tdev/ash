@@ -322,6 +322,8 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
   const [modelIsNew, setModelIsNew] = useState(false);
   const [providerEdit, setProviderEdit] = useState<EngineProvider | null>(null);
   const [providerIsNew, setProviderIsNew] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+  const [searchPos, setSearchPos] = useState({ left: 0, top: 0, w: 196, h: 32 });
 
   const doReset = async () => {
     setResetting(true);
@@ -557,7 +559,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
           Back
         </button>
         <div className="settings-search-wrap" data-tauri-drag-region>
-          <div className={`settings-search${searchQuery && searchActive ? " open" : ""}`}>
+          <div className="settings-search" ref={searchRef}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <circle cx="11" cy="11" r="7" />
               <path d="m20 20-3.5-3.5" />
@@ -567,7 +569,11 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search"
               spellCheck={false}
-              onFocus={() => setSearchActive(true)}
+              onFocus={() => {
+                setSearchActive(true);
+                const r = searchRef.current?.getBoundingClientRect();
+                if (r) setSearchPos({ left: r.left, top: r.top, w: r.width, h: r.height });
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Escape" && search) {
                   e.stopPropagation();
@@ -595,7 +601,15 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
             )}
           </div>
           {searchQuery && searchActive && (
-            <div className="settings-search-results">
+            <div
+              className="settings-search-results"
+              style={{
+                left: searchPos.left,
+                top: searchPos.top,
+                "--tw": `${searchPos.w}px`,
+                "--th": `${searchPos.h}px`,
+              } as React.CSSProperties}
+            >
               {visibleSearchResults.length ? (
                 visibleSearchResults.map((item, i) => (
                   <button

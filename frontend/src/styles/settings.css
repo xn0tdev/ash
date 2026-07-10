@@ -236,21 +236,22 @@
 
 .settings-search-results {
   position: fixed;
-  z-index: 90;
-  /* Float to the right of the nav search input — start at the input's top,
-     extend into the content area. Width is generous so labels + category fit. */
-  left: 220px;
-  top: 62px;
-  width: 360px;
-  max-width: calc(100vw - 240px);
+  z-index: 95;
+  /* Same mechanism as .ash-select-menu: positioned ON the search input (same
+     top-left), grows from the input's own rect via clip-path — starts showing
+     only the input-sized top-left corner and expands to full width+height. */
+  width: calc(var(--tw, 196px) + 24px);
   padding: 5px;
   border-radius: 12px;
   corner-shape: squircle;
   background: var(--raise);
-  box-shadow: 0 14px 40px color-mix(in srgb, var(--shadow) 32%, transparent);
+  box-shadow:
+    0 12px 30px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.07);
   transform-origin: top left;
-  overflow: hidden;
-  animation: settingsSearchSelectIn 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: ashSelectIn 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+  display: flex;
+  flex-direction: column;
 }
 
 @keyframes settingsSearchSelectIn {
@@ -282,9 +283,9 @@
   text-align: left;
   font: inherit;
   opacity: 0;
-  transform: translateY(-4px);
+  transform: translateY(-3px);
   animation: settingsSearchResultIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  animation-delay: calc(var(--i, 0) * 18ms + 35ms);
+  animation-delay: calc(var(--i, 0) * 22ms + 60ms);
 }
 
 @keyframes settingsSearchResultIn {
