@@ -88,4 +88,8 @@
 
 .term-container .xterm-viewport {
   background-color: transparent !important;
+  scrollbar-width: none;
+}
+.term-container .xterm-viewport::-webkit-scrollbar {
+  display: none;
 }

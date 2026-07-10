@@ -28,6 +28,17 @@
   outline: none;
 }
 
+/* Desktop app — no visible scrollbars anywhere (native apps don't show
+   them). xterm's viewport scroll especially read as a web artifact here. */
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+* {
+  scrollbar-width: none;
+}
+
 html,
 body,
 #root {
