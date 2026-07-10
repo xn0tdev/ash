@@ -33,9 +33,10 @@ on startup and offers to update from a blue **Update** button in the titlebar.
 
 - A git tag `vX.Y.Z` triggers `.github/workflows/release.yml`, which builds
   `Ash.exe` with `-ldflags "-X ash-wails/internal/app.Version=X.Y.Z -X ash-wails/internal/app.Commit=<sha>"` and
-  uploads it to the corresponding GitHub Release.
-- The release asset **must** be named `Ash.exe` — that's what the updater
-  looks for (`assetName` in `updater.go`).
+  uploads two assets: the bare `Ash.exe` (self-update target) and an NSIS
+  installer `Ash-Setup-vX.Y.Z.exe` (for fresh installs).
+- The self-update asset **must** be named `Ash.exe` — that's what the updater
+  looks for (`assetName` in `updater.go`). The installer name is cosmetic.
 - The version defaults to `"dev"` for local `wails build` (no ldflags), so
   any real release is always considered newer.
 

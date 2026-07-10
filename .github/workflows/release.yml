@@ -1,8 +1,9 @@
 name: Release
 
-# Triggered by a version tag (vMAJOR.MINOR.PATCH). Builds Ash.exe with the
-# version baked in via ldflags, then publishes a GitHub Release with Ash.exe
-# attached — that asset is what the in-app self-updater downloads.
+# Triggered by a version tag (vMAJOR.MINOR.PATCH). Builds Ash.exe AND the NSIS
+# installer with the version baked in via ldflags, then publishes a GitHub
+# Release with BOTH assets attached — the bare .exe (what the in-app self-updater
+# downloads) and the installer (for fresh installs).
 on:
   push:
     tags:
@@ -42,21 +43,33 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Version: $VERSION"
 
-      - name: Build Ash.exe (versioned, release channel)
+      - name: Build Ash.exe + NSIS installer (versioned, release channel)
         run: |
-          wails build -ldflags "-X ash-wails/internal/app.Version=${{ steps.ver.outputs.version }} -X ash-wails/internal/app.Commit=${{ github.sha }} -X ash-wails/internal/app.BuildChannel=release"
+          # -nsis generates the installer alongside the bare .exe.
+          wails build -nsis -ldflags "-X ash-wails/internal/app.Version=${{ steps.ver.outputs.version }} -X ash-wails/internal/app.Commit=${{ github.sha }} -X ash-wails/internal/app.BuildChannel=release"
 
-      - name: Stage asset
+      - name: Stage assets
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path staging | Out-Null
+          $ver = "${{ steps.ver.outputs.version }}"
+          # Bare binary — the in-app self-updater downloads exactly this name.
           Copy-Item "build\bin\Ash.exe" "staging\Ash.exe"
-          Write-Host "Asset: $((Get-Item 'staging\Ash.exe').Length) bytes"
+          # Installer — friendlier name with the version, so users know which
+          # release they're installing from the Downloads folder.
+          Copy-Item "build\bin\Ash-amd64-installer.exe" "staging\Ash-Setup-v$ver.exe"
+          Get-ChildItem staging | ForEach-Object {
+            Write-Host "Asset: $($_.Name) — $($_.Length) bytes"
+          }
 
-      - name: Create release + upload asset
+      - name: Create release + upload assets
         uses: softprops/action-gh-release@v2
         with:
           name: ${{ github.ref_name }}
           generate_release_notes: true
-          files: staging/Ash.exe
+          # Both the bare .exe (self-update target) and the installer (fresh
+          # installs) ship in every release.
+          files: |
+            staging/Ash.exe
+            staging/Ash-Setup-v*.exe
           fail_on_unmatched_files: true

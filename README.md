@@ -36,9 +36,9 @@ wails build -nsis  # + NSIS installer → build/bin/Ash-amd64-installer.exe
 
 `make build / installer / dev / run / clean` are equivalent — see the [Makefile](Makefile).
 
-## Install (binary)
+## Install
 
-Download `Ash.exe` from the [latest release](https://github.com/xn0tdev/ash/releases/latest) and run it, or use the NSIS installer which installs to `C:\Program Files\Ash`. On startup Ash checks `/releases/latest` and offers to self-update — a blue **Update** button appears in the sidebar when a new version is out. See [docs/updater.md](docs/updater.md) for the swap flow.
+Download `Ash.exe` from the [latest release](https://github.com/xn0tdev/ash/releases/latest) and run it, or grab the NSIS installer `Ash-Setup-v*.exe` for a standard Windows install (it installs to `C:\Program Files\Ash` and adds Start-menu / desktop shortcuts). On startup Ash checks `/releases/latest` and offers to self-update — a blue **Update** button appears in the sidebar when a new version is out. See [docs/updater.md](docs/updater.md) for the swap flow.
 
 ## Versioning
 
