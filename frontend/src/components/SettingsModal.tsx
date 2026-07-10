@@ -1308,7 +1308,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                       })
                     }
                     options={[
-                      { value: "auto", label: "Auto (family default)" },
+                      { value: "auto", label: "Auto (safe default)" },
                       { value: "reasoning_effort", label: "reasoning_effort (OpenAI-compat)" },
                       { value: "enable_thinking", label: "enable_thinking (GLM/Zhipu)" },
                       { value: "thinking_object", label: "thinking object (Anthropic)" },

@@ -11,9 +11,9 @@ import type { ReasoningEffort } from "../settings";
 //    the provider surfaces them as thought_delta instead of final text.
 //
 // The family is resolved from models.dev (see models-dev.ts) or inferred from
-// the model id stem. Unknown families fall back to the OpenAI-compat default
-// (reasoning_effort + reasoning_content), which is the most widely accepted
-// shape across proxy/compat APIs.
+// the model id stem. Unknown/proxy-hosted families fall back to native/no-param:
+// many OpenAI-compatible gateways reject or mis-handle reasoning params, which
+// can produce Thought-only turns with no tool calls.
 
 export interface ThinkingSpec {
   /** Body fields to merge for the requested effort. null = send nothing. */
@@ -62,12 +62,10 @@ const nativeThinking: ThinkingSpec = {
 };
 
 // ── family → spec registry ────────────────────────────────
-// DEFAULT is reasoning_effort — the most widely accepted shape across
-// OpenAI-compat proxies (Cursor backend, OpenRouter, Fireworks, …). Any model
-// whose specific endpoint needs a different shape (enable_thinking for raw
-// Zhipu, thinking object for raw Anthropic) can override it per-model in
-// Settings via EngineModel.thinkingFormat. The registry below is only the
-// fallback heuristic when a model has no explicit format set.
+// DEFAULT is native/no-param — safest for agent loops on OpenAI-compatible
+// proxies. Some gateways accept reasoning_effort but then stream only
+// reasoning_content and never call tools. Models/endpoints that really support a
+// thinking param can override it per-model in Settings > Agents > Models > Edit.
 const FAMILY_THINKING: { prefix: string; spec: ThinkingSpec }[] = [
   // OpenAI o-series + GPT-5 — reasoning_effort is the native param.
   { prefix: "gpt", spec: reasoningEffort },
@@ -81,24 +79,22 @@ const FAMILY_THINKING: { prefix: string; spec: ThinkingSpec }[] = [
   // param isn't needed (they think by default), so nativeThinking.
   { prefix: "deepseek", spec: nativeThinking },
 
-  // Gemini — through compat proxies, reasoning_effort is typically forwarded.
-  { prefix: "gemini", spec: reasoningEffort },
-
-  // GLM / Claude / Mistral / Qwen / Kimi / Minimax / Llama — default to
-  // reasoning_effort (compat-safe). If a specific endpoint needs
-  // enable_thinking or the Anthropic thinking object, set it per-model in
-  // Settings > Agents > Models > Edit.
-  { prefix: "glm", spec: reasoningEffort },
-  { prefix: "claude", spec: reasoningEffort },
-  { prefix: "mistral", spec: reasoningEffort },
-  { prefix: "mixtral", spec: reasoningEffort },
-  { prefix: "kimi", spec: reasoningEffort },
-  { prefix: "minimax", spec: reasoningEffort },
-  { prefix: "qwen", spec: reasoningEffort },
-  { prefix: "llama", spec: reasoningEffort },
+  // GLM / Claude / Gemini / Mistral / Qwen / Kimi / Minimax / Llama are often
+  // served through compat proxies with different/restricted schemas; do not
+  // send a reasoning param by default. If a specific endpoint supports one, set
+  // it explicitly per-model in Settings.
+  { prefix: "glm", spec: nativeThinking },
+  { prefix: "claude", spec: nativeThinking },
+  { prefix: "gemini", spec: nativeThinking },
+  { prefix: "mistral", spec: nativeThinking },
+  { prefix: "mixtral", spec: nativeThinking },
+  { prefix: "kimi", spec: nativeThinking },
+  { prefix: "minimax", spec: nativeThinking },
+  { prefix: "qwen", spec: nativeThinking },
+  { prefix: "llama", spec: nativeThinking },
 ];
 
-const DEFAULT_SPEC = reasoningEffort;
+const DEFAULT_SPEC = nativeThinking;
 
 /** Thinking format ids, stable for persistence in EngineModel.thinkingFormat. */
 export type ThinkingFormat = "reasoning_effort" | "enable_thinking" | "thinking_object" | "native";
