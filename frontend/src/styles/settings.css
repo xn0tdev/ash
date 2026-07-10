@@ -199,6 +199,10 @@
   transition: background-color 0.1s ease;
 }
 
+.settings-search.open {
+  border-radius: 10px 10px 0 0;
+}
+
 .settings-search:focus-within {
   background: color-mix(in srgb, var(--hover) 60%, var(--raise));
   color: var(--muted);
@@ -237,21 +241,36 @@
 .settings-search-results {
   position: fixed;
   z-index: 95;
-  /* Same mechanism as .ash-select-menu: positioned ON the search input (same
-     top-left), grows from the input's own rect via clip-path — starts showing
-     only the input-sized top-left corner and expands to full width+height. */
-  width: calc(var(--tw, 196px) + 24px);
+  /* Connected to the search input: sits directly below it, same width, so the
+     input + results read as one rect growing downward. Grows from 0 height via
+     clip-path (same family as ashSelectIn, but anchored to the TOP edge since
+     this panel starts below the trigger, not on top of it). */
+  width: var(--tw, 196px);
   padding: 5px;
-  border-radius: 12px;
+  border-radius: 0 0 12px 12px;
   corner-shape: squircle;
   background: var(--raise);
   box-shadow:
     0 12px 30px rgba(0, 0, 0, 0.5),
     0 0 0 1px rgba(255, 255, 255, 0.07);
-  transform-origin: top left;
-  animation: ashSelectIn 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+  transform-origin: top center;
   display: flex;
   flex-direction: column;
+  animation: settingsSearchGrowDown 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes settingsSearchGrowDown {
+  from {
+    opacity: 0;
+    clip-path: inset(0 0 100% 0);
+  }
+  60% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+  }
 }
 
 @keyframes settingsSearchSelectIn {

@@ -559,7 +559,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
           Back
         </button>
         <div className="settings-search-wrap" data-tauri-drag-region>
-          <div className="settings-search" ref={searchRef}>
+          <div className={`settings-search${searchQuery && searchActive ? " open" : ""}`} ref={searchRef}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <circle cx="11" cy="11" r="7" />
               <path d="m20 20-3.5-3.5" />
@@ -572,7 +572,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
               onFocus={() => {
                 setSearchActive(true);
                 const r = searchRef.current?.getBoundingClientRect();
-                if (r) setSearchPos({ left: r.left, top: r.top, w: r.width, h: r.height });
+                if (r) setSearchPos({ left: r.left, top: r.top + r.height, w: r.width, h: r.height });
               }}
               onKeyDown={(e) => {
                 if (e.key === "Escape" && search) {
@@ -607,7 +607,6 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                 left: searchPos.left,
                 top: searchPos.top,
                 "--tw": `${searchPos.w}px`,
-                "--th": `${searchPos.h}px`,
               } as React.CSSProperties}
             >
               {visibleSearchResults.length ? (
