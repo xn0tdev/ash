@@ -17,7 +17,7 @@ function toOpenAIMessages(messages: Message[], supportsImages: boolean): Record<
         .map((c) => (c.type === "text" ? c.text : ""))
         .join("");
       const toolUses = m.content.filter((c) => c.type === "tool_use");
-      const msg: Record<string, unknown> = { role: "assistant", content: text || null };
+      const msg: Record<string, unknown> = { role: "assistant", content: text || "" };
       if (toolUses.length)
         msg.tool_calls = toolUses.map((tu) =>
           tu.type === "tool_use"
