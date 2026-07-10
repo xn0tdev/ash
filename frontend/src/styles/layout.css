@@ -15,12 +15,10 @@
 /* Single fixed sidebar toggle — same spot whether the sidebar is open or not. */
 .app-toggle {
   position: absolute;
-  top: 7px;
-  /* align the toggle icon's left edge with the sidebar row icons below it
-     (sidebar padding 8 + row padding 8 = 16px; 20px icon in a 28px button is
-     5px inset, so left 9 puts the icon at 14px) — sits neatly over the
-     list, level with the rail-top row */
-  left: 9px;
+  top: 8px;
+  /* Match the sidebar's outer inset: equal 8px from the window's top/left so
+     the toggle sits cleanly in the rail instead of feeling one pixel off. */
+  left: 8px;
   z-index: 50;
   display: flex;
   align-items: center;
