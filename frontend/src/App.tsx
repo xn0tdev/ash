@@ -1,75 +1,147 @@
-import { useEffect, useRef } from "react";
-import { Terminal } from "@xterm/xterm";
-import { FitAddon } from "@xterm/addon-fit";
-import { EventsOn } from "../wailsjs/runtime";
-import { OpenPTY, WritePTY, ResizePTY } from "../wailsjs/go/main/Pty";
+import { useCallback, useEffect, useRef, useState } from "react";
 import TitleBar from "./TitleBar";
-import "@xterm/xterm/css/xterm.css";
+import Sidebar from "./components/Sidebar";
+import PaneLayout from "./components/PaneLayout";
+import { disposeSession } from "./lib/term";
+import { leaves, removeLeaf, splitLeaf, termLeaf } from "./lib/layout";
+import { makeTab, Tab } from "./tabs";
+import "./sidebar.css";
+import "./layout.css";
 import "./App.css";
 
-// Spike shell: frameless titlebar + a single xterm pane wired to the Go
-// ConPTY bridge. PTY output arrives as Wails events ("pty:<id>"); keystrokes
-// flow back through WritePTY. This is the minimum to feel whether the Wails
-// stack + Go backend is pleasant before committing to a full port.
+// Phase-1 shell: frameless titlebar + sidebar + multi-tab + recursive split
+// tree of terminal panes. This is the first app-shaped milestone of the
+// Wails port — enough to feel the layout/split/sidebar UX on Go. Agent /
+// explorer / settings / browser panes arrive in later phases (placeholders
+// inside PaneLayout for now).
 export default function App() {
-  const termRef = useRef<HTMLDivElement>(null);
-  const idRef = useRef<string>("");
-  // Status is debug-only here; not rendered in the spike shell.
+  const [tabs, setTabs] = useState<Tab[]>(() => [makeTab()]);
+  const [activeTabId, setActiveTabId] = useState<string>(() => tabs[0].id);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const tabsRef = useRef(tabs);
+  tabsRef.current = tabs;
 
-  useEffect(() => {
-    if (!termRef.current) return;
-    const term = new Terminal({
-      allowProposedApi: true,
-      cursorBlink: true,
-      cursorStyle: "bar",
-      fontFamily: 'Consolas, "Cascadia Mono", monospace',
-      fontSize: 15,
-      theme: {
-        background: "#0a0a0a",
-        foreground: "#ececec",
-        cursor: "#ececec",
-      },
-    });
-    const fit = new FitAddon();
-    term.loadAddon(fit);
-    term.open(termRef.current);
-    fit.fit();
+  const activeTab = tabs.find((t) => t.id === activeTabId) ?? tabs[0];
 
-    const cols = term.cols;
-    const rows = term.rows;
-
-    // Open a ConPTY on the Go side; we get back an id to address it by.
-    OpenPTY("", cols, rows)
-      .then((id: string) => {
-        idRef.current = id;
-        // Stream: ConPTY output → xterm writes.
-        EventsOn("pty:" + id, (data: string) => term.write(data));
-        EventsOn("pty:" + id + ":done", () => {});
-        // Keystrokes → PTY stdin.
-        const disp = term.onData((d) => WritePTY(id, d).catch(() => {}));
-        // Keep the dispose handle for cleanup.
-        (term as any)._disp = disp;
-      })
-      .catch((e: unknown) => console.error("open pty:", e));
-
-    // Resize the PTY when the pane geometry changes.
-    const ro = new ResizeObserver(() => {
-      fit.fit();
-      if (idRef.current) ResizePTY(idRef.current, term.cols, term.rows).catch(() => {});
-    });
-    ro.observe(termRef.current);
-
-    return () => {
-      ro.disconnect();
-      (term as any)._disp?.dispose();
-      term.dispose();
-    };
+  const setTab = useCallback((id: string, patch: Partial<Tab>) => {
+    setTabs((ts) => ts.map((t) => (t.id === id ? { ...t, ...patch } : t)));
   }, []);
 
+  const focusPane = useCallback((tabId: string, paneId: string) => {
+    setTab(tabId, { activePane: paneId });
+    setActiveTabId(tabId);
+  }, [setTab]);
+
+  const setRatio = useCallback((tabId: string, splitId: string, ratio: number) => {
+    setTabs((ts) =>
+      ts.map((t) =>
+        t.id === tabId ? { ...t, root: setSplitRatioLocal(t.root, splitId, ratio) } : t,
+      ),
+    );
+  }, []);
+
+  const newTab = useCallback(() => {
+    const t = makeTab();
+    setTabs((ts) => [...ts, t]);
+    setActiveTabId(t.id);
+  }, []);
+
+  const closeTab = useCallback((id: string) => {
+    setTabs((ts) => {
+      if (ts.length <= 1) return ts;
+      const idx = ts.findIndex((t) => t.id === id);
+      // Tear down every terminal session in the tab before dropping it.
+      leaves(ts[idx].root).forEach((l) => {
+        if (l.kind === "term") disposeSession(l.id);
+      });
+      const next = ts.filter((t) => t.id !== id);
+      if (id === activeTabId) setActiveTabId(next[Math.max(0, idx - 1)].id);
+      return next;
+    });
+  }, [activeTabId]);
+
+  const splitActive = useCallback((dir: "row" | "col") => {
+    if (!activeTab) return;
+    const paneId = crypto.randomUUID();
+    setTabs((ts) =>
+      ts.map((t) =>
+        t.id === activeTab.id
+          ? { ...t, root: splitLeaf(t.root, t.activePane, dir, termLeaf(paneId)), activePane: paneId }
+          : t,
+      ),
+    );
+  }, [activeTab]);
+
+  const closePane = useCallback((paneId: string) => {
+    if (!activeTab) return;
+    const ls = leaves(activeTab.root);
+    if (ls.length <= 1) return; // never empty a tab to zero panes
+    disposeSession(paneId);
+    const newRoot = removeLeaf(activeTab.root, paneId);
+    if (newRoot) {
+      setTab(activeTab.id, {
+        root: newRoot,
+        activePane: activeTab.activePane === paneId ? leaves(newRoot)[0].id : activeTab.activePane,
+      });
+    }
+  }, [activeTab, setTab]);
+
+  // Hotkeys: new tab, close tab, split right/down, cycle tabs. Matches Ash.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!e.ctrlKey || !e.shiftKey) return;
+      if (e.key === "T") { e.preventDefault(); newTab(); }
+      else if (e.key === "W") { e.preventDefault(); if (activeTab) closeTab(activeTab.id); }
+      else if (e.key === "D") { e.preventDefault(); splitActive("row"); }
+      else if (e.key === "E") { e.preventDefault(); splitActive("col"); }
+      else if (e.key === "B") { e.preventDefault(); setSidebarCollapsed((c) => !c); }
+      else if (e.key === "Tab") {
+        e.preventDefault();
+        const ts = tabsRef.current;
+        if (ts.length < 2) return;
+        const idx = ts.findIndex((t) => t.id === activeTabId);
+        setActiveTabId(ts[(idx + 1) % ts.length].id);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [newTab, closeTab, splitActive, activeTabId, activeTab]);
+
+  if (!activeTab) return null;
+  const panes = leaves(activeTab.root);
+
   return (
-    <div id="App" style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+    <div className="main">
       <TitleBar />
-      <div className="term-container" ref={termRef} />
+      <div className="main-body">
+        <Sidebar
+          tabs={tabs}
+          activeTabId={activeTabId}
+          onSelect={setActiveTabId}
+          onClose={closeTab}
+          onNew={newTab}
+          collapsed={sidebarCollapsed}
+        />
+        <div className="pane-area">
+          <PaneLayout
+            node={activeTab.root}
+            tabId={activeTab.id}
+            tabActive={true}
+            activePane={activeTab.activePane}
+            multi={panes.length > 1}
+            onFocus={focusPane}
+            onRatio={setRatio}
+          />
+        </div>
+      </div>
     </div>
   );
+}
+
+// Local copy of setSplitRatio to avoid pulling the whole layout module surface
+// through an import cycle — the helper is tiny and stable.
+function setSplitRatioLocal(node: import("./lib/layout").PaneNode, splitId: string, ratio: number): import("./lib/layout").PaneNode {
+  if (node.type === "leaf") return node;
+  if (node.id === splitId) return { ...node, ratio };
+  return { ...node, a: setSplitRatioLocal(node.a, splitId, ratio), b: setSplitRatioLocal(node.b, splitId, ratio) };
 }

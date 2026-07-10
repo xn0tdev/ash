@@ -1,7 +1,5 @@
 /* Custom titlebar — frameless window, drag via --wails-draggable:drag.
-   Direct port of Ash's TitleBar.tsx (Tauri) → Wails: data-tauri-drag-region
-   becomes the --wails-draggable CSS var, window controls come from
-   @wailsio/runtime instead of @tauri-apps/api/window. */
+   Ported from Ash's TitleBar.tsx (Tauri) → Wails. */
 .main-head {
   display: flex;
   align-items: center;
@@ -32,25 +30,6 @@
   gap: 2px;
 }
 
-.tb-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border: none;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--muted);
-  cursor: default;
-  transition: background-color 0.1s ease, color 0.1s ease;
-}
-
-.tb-btn:hover {
-  background: var(--hover);
-  color: var(--text);
-}
-
 .wc-btn {
   display: flex;
   align-items: center;
@@ -77,24 +56,4 @@
 .wc-close:hover {
   background: transparent;
   color: var(--text);
-}
-
-/* terminal pane */
-.term-container {
-  flex: 1;
-  min-height: 0;
-  padding: 8px;
-  background: var(--bg);
-}
-
-.term-container .xterm {
-  height: 100%;
-}
-
-.term-container .xterm-viewport {
-  background-color: transparent !important;
-  scrollbar-width: none;
-}
-.term-container .xterm-viewport::-webkit-scrollbar {
-  display: none;
 }

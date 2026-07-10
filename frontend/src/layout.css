@@ -1,0 +1,120 @@
+/* Split tree + panes — ported verbatim from Ash's welcome.css (the split/pane
+   rules live there in the original). Pure CSS, no Tauri dependency. */
+
+.split {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.split.row {
+  flex-direction: row;
+}
+
+.split.col {
+  flex-direction: column;
+}
+
+.split-child {
+  display: flex;
+  flex-shrink: 1;
+  flex-basis: 0;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* invisible drag zone with a grip shown on hover */
+.divider {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 6px;
+}
+
+.split.row > .divider {
+  cursor: col-resize;
+}
+
+.split.col > .divider {
+  cursor: row-resize;
+}
+
+.divider::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 3px;
+  background: transparent;
+  transition: background 0.12s ease;
+}
+
+.split.row > .divider::after {
+  width: 3px;
+  height: 36px;
+}
+
+.split.col > .divider::after {
+  width: 36px;
+  height: 3px;
+}
+
+.divider:hover::after {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.split .pane {
+  border-radius: 14px;
+}
+
+.pane {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  padding: 12px 8px 12px 14px;
+  background: var(--surface);
+  border-radius: 20px 20px 10px 10px;
+  corner-shape: squircle;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.055);
+  transition: opacity 0.15s ease;
+}
+
+.pane.term-pane {
+  box-shadow: none;
+}
+
+.pane.dim {
+  opacity: 0.55;
+}
+
+/* placeholder for not-yet-ported pane kinds (web/file/agent) */
+.placeholder-pane {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--faint);
+  font-size: 13px;
+}
+
+.term-host,
+.term-container {
+  width: 100%;
+  height: 100%;
+}
+
+.term-host .xterm,
+.term-container .xterm {
+  height: 100%;
+}
+
+/* xterm's inner mount div fills the host */
+.term-inner {
+  height: 100%;
+}
+
+body.dragging iframe {
+  pointer-events: none;
+}
