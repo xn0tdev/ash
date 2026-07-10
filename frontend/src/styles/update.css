@@ -1,22 +1,18 @@
-/* Update badge — sits in the titlebar, right after the sidebar toggle.
-   Blue accent so a pending update is visible without being loud. */
+/* Update badge — icon-only pill at the end of the titlebar (after the
+   window controls). Blue accent so a pending update is visible without being
+   loud. Capsule shape = fully rounded. */
 .update-badge {
-  position: absolute;
-  top: 8px;
-  left: 44px; /* app-toggle is 8px + 28px wide → 8px gap */
-  z-index: 50;
-  display: flex;
+  flex-shrink: 0;
+  display: inline-flex;
   align-items: center;
-  gap: 5px;
-  height: 28px;
-  padding: 0 10px 0 8px;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin-left: 6px;
   border: none;
-  border-radius: 9px;
-  corner-shape: squircle;
+  border-radius: 999px; /* full capsule */
   background: color-mix(in oklch, var(--accent, #2563eb) 90%, transparent);
   color: #fff;
-  font: 600 12px/1 "Inter", sans-serif;
-  letter-spacing: 0.01em;
   cursor: default;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
   transition: filter 0.12s ease, transform 0.12s ease;
@@ -61,7 +57,7 @@
 .update-titles { flex: 1; min-width: 0; }
 .update-titles h3 {
   margin: 0;
-  font: 600 14px/1.3 "Inter", sans-serif;
+  font: 500 14px/1.3 "Inter", sans-serif;
   color: var(--text);
 }
 .update-ver {
@@ -73,7 +69,7 @@
   color: var(--faint);
 }
 .update-ver .cur { color: var(--faint); }
-.update-ver .nxt { color: var(--accent, #2563eb); font-weight: 600; }
+.update-ver .nxt { color: var(--accent, #2563eb); font-weight: 500; }
 .update-modal .modal-x {
   flex-shrink: 0;
   width: 26px;
@@ -150,7 +146,7 @@
   padding: 0 14px;
   border: none;
   border-radius: 8px;
-  font: 600 12px/1 "Inter", sans-serif;
+  font: 500 12px/1 "Inter", sans-serif;
   cursor: default;
 }
 .update-modal .btn-primary {

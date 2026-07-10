@@ -14,6 +14,8 @@ interface TitleBarProps {
   workspaceName: string | null;
   branch: string | null;
   sidebarOpen: boolean;
+  showUpdateBadge: boolean;
+  onUpdate: () => void;
 }
 
 export default function TitleBar({
@@ -21,6 +23,8 @@ export default function TitleBar({
   workspaceName,
   branch,
   sidebarOpen,
+  showUpdateBadge,
+  onUpdate,
 }: TitleBarProps) {
   const [maximized, setMaximized] = useState(false);
 
@@ -118,6 +122,18 @@ export default function TitleBar({
             </svg>
           </button>
         </div>
+        )}
+        {showUpdateBadge && (
+          <button
+            className="update-badge"
+            title="A new version of Ash is available"
+            onClick={onUpdate}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+              <path d="M21 3v6h-6" />
+            </svg>
+          </button>
         )}
       </div>
     </header>
