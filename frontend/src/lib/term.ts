@@ -59,6 +59,43 @@ let events: SessionEvents | null = null;
 // (drag-to-workspace respawns it in the folder); a used one must be kept.
 const used = new Set<string>();
 
+/** Read the clipboard, retrying briefly so a dictation app (Wispr Flow) that
+ *  sets the clipboard and simulates the keystroke near-simultaneously doesn't
+ *  lose the race. Tries both the Tauri binding and the web navigator.clipboard
+ *  API — whichever returns text first wins. */
+async function readClipboardReliable(): Promise<string> {
+  for (let attempt = 0; attempt < 6; attempt++) {
+    // Tauri binding (Go clipboard) — usually the reliable one in Wails.
+    const tauriText = await readText().catch(() => "");
+    if (tauriText) return tauriText;
+    // Web Clipboard API — sometimes populated sooner by the dictation app.
+    try {
+      const webText = await navigator.clipboard.readText();
+      if (webText) return webText;
+    } catch {
+      // navigator.clipboard can be unavailable (permissions / non-secure
+      // context) — the Tauri path is the fallback below.
+    }
+    // Backoff: 30 → 60 → 90 → 120 → 150 ms. Total worst case ~450 ms, which
+    // is imperceptible for a paste but covers the clipboard-settle race.
+    await new Promise((r) => setTimeout(r, 30 * (attempt + 1)));
+  }
+  return "";
+}
+
+/** Paste from the clipboard into pane `id`, marking the session used. Used by
+ *  the Ctrl+V keybind and the right-click paste — the synchronous `paste`
+ *  event listener (in attachRenderer) handles external paste dispatches. */
+function pasteFromClipboard(id: string): void {
+  readClipboardReliable()
+    .then((text) => {
+      if (!text) return;
+      used.add(id);
+      ptyWrite(id, text);
+    })
+    .catch(() => {});
+}
+
 /** True if anything happened in this terminal since it spawned. */
 export function isSessionUsed(id: string): boolean {
   return used.has(id);
@@ -265,19 +302,18 @@ function attachRenderer(session: TermSession, host: HTMLElement, useWebgl = true
     // 0x16 "literal-next-char" control byte to the pty — NOT a paste — so
     // keyboard paste never inserted anything, and external dictation apps
     // (Wispr Flow) that inject via clipboard + a synthetic keystroke couldn't
-    // paste either. Intercept and read the clipboard through the native
-    // (Tauri) plugin, which bypasses the flaky browser clipboard API in the
-    // Wails webview, then write the text straight to the pty. Returning
-    // false makes xterm preventDefault the keydown — so the browser's native
-    // paste event never fires and there's no double-paste (we own it).
+    // paste either. Intercept and read the clipboard, then write the text
+    // straight to the pty. Returning false makes xterm preventDefault the
+    // keydown — so the browser's native paste event never fires and there's
+    // no double-paste (we own it).
+    //
+    // External dictation apps (Wispr Flow) race the clipboard: they set it
+    // and simulate the keystroke near-simultaneously, so a single async read
+    // can come back empty. Retry a few times with backoff, and try BOTH the
+    // Tauri clipboard binding and the web navigator.clipboard API — whichever
+    // returns text first wins.
     if (e.ctrlKey && !e.altKey && e.code === "KeyV") {
-      readText()
-        .then((t) => {
-          if (!t) return;
-          used.add(id);
-          ptyWrite(id, t);
-        })
-        .catch(() => {});
+      pasteFromClipboard(id);
       return false;
     }
     // App-level shortcuts pass through untouched.
@@ -304,16 +340,29 @@ function attachRenderer(session: TermSession, host: HTMLElement, useWebgl = true
       writeText(term.getSelection()).catch(() => {});
       term.clearSelection();
     } else {
-      readText()
-        .then((t) => {
-          if (t) {
-            used.add(id);
-            ptyWrite(id, t);
-          }
-        })
-        .catch(() => {});
+      pasteFromClipboard(id);
     }
   });
+
+  // Synchronous paste event — the reliable path for external dictation apps
+  // (Wispr Flow) that dispatch a paste event directly. e.clipboardData is
+  // available synchronously inside the event, so there's no async race: we
+  // get exactly the text being pasted, the instant it's pasted. Capture +
+  // stopPropagation so xterm's own textarea paste handler never also fires
+  // (which would double-paste).
+  container.addEventListener(
+    "paste",
+    (e: ClipboardEvent) => {
+      const text = e.clipboardData?.getData("text/plain");
+      if (text) {
+        e.preventDefault();
+        e.stopPropagation();
+        used.add(id);
+        ptyWrite(id, text);
+      }
+    },
+    true, // capture: beat xterm's own paste handler
+  );
 
   term.onData((data) => {
     used.add(id); // any keystroke makes the terminal non-pristine
