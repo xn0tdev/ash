@@ -1,19 +1,15 @@
 /* Update button — blue filled capsule, white "Update" text.
-   Lives at the TOP of the SIDEBAR (above New agent / Search / New terminal),
-   aligned with the titlebar strip — NOT in the titlebar / chat chrome. */
-
-.side-update {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  /* Align with the titlebar's vertical center: rail-top is the brand strip
-     above the sidebar content; side-update sits just under it, at the red-
-     cube zone on screenshots. */
-  height: 34px;
-  padding: 0 2px 4px;
-}
+   Sits immediately AFTER the sidebar toggle (.app-toggle) in the top-left
+   strip (the red-cube zone). Absolute on .app (position:relative) so the
+   titlebar title never moves. */
 
 .update-badge {
+  position: absolute;
+  /* Vertically align with the 28px toggle at top:8 → (28-24)/2 + 8 = 10 */
+  top: 10px;
+  /* Toggle is left:8 width:28 → sit 6px after it */
+  left: 42px;
+  z-index: 50;
   height: 24px;
   padding: 0 12px;
   border: none;
@@ -23,15 +19,20 @@
   font: 500 12px/1 "Inter", sans-serif;
   letter-spacing: 0.01em;
   cursor: default;
-  /* hover: background only — no filter/brightness that re-rasterizes the type */
+  /* hover: background only — no filter on the type */
   transition: background-color 0.12s ease;
   user-select: none;
 }
 .update-badge:hover {
-  background: #1d4ed8; /* one step darker blue */
+  background: #1d4ed8;
 }
 .update-badge:active {
   background: #1e40af;
+}
+
+/* macOS: toggle is shifted right for traffic lights */
+.mac .update-badge {
+  left: 112px; /* toggle at 78 + 28 + 6 */
 }
 
 /* ── Update modal ─────────────────────────────────────────

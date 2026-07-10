@@ -1431,6 +1431,18 @@ export default function App() {
           <rect className="tgl-outline" x="6" y="8" width="4.5" height="8" rx="2" />
         </svg>
       </button>
+      {/* Self-update pill — sits immediately AFTER the sidebar toggle icon
+          (same top strip). Absolute on .app so it never shifts the title. */}
+      {updateAvailable && (
+        <button
+          type="button"
+          className="update-badge"
+          title="A new version of Ash is available"
+          onClick={() => setUpdateOpen(true)}
+        >
+          Update
+        </button>
+      )}
       <div
         className={`rail${collapsed ? " collapsed" : ""}`}
         style={{ width: collapsed ? 0 : sidebarWidth }}
@@ -1476,8 +1488,6 @@ export default function App() {
           onOpenSearch={() => setPaletteOpen(true)}
           onCloseAll={() => setConfirmCloseAll(true)}
           onOpenSettings={() => setSettingsOpen(true)}
-          showUpdateBadge={updateAvailable}
-          onUpdate={() => setUpdateOpen(true)}
         />
       </div>
       {!collapsed && (

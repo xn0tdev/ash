@@ -52,9 +52,6 @@ interface SidebarProps {
   onOpenAgent: () => void;
   onRename: (id: string, title: string) => void;
   onOpenSettings: () => void;
-  /** Show the blue self-update pill above the action list when a release is available. */
-  showUpdateBadge?: boolean;
-  onUpdate?: () => void;
 }
 
 import {
@@ -123,8 +120,6 @@ export default function Sidebar({
   onOpenAgent,
   onRename,
   onOpenSettings,
-  showUpdateBadge = false,
-  onUpdate,
 }: SidebarProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
@@ -605,15 +600,6 @@ export default function Sidebar({
 
   return (
     <aside className="sidebar">
-      {/* Top of the sidebar (titlebar-aligned strip) — self-update pill sits
-          here, NOT in the titlebar. Only when a GitHub release is newer. */}
-      {showUpdateBadge && onUpdate && (
-        <div className="side-update">
-          <button type="button" className="update-badge" onClick={onUpdate}>
-            Update
-          </button>
-        </div>
-      )}
       <div className="side-top">
         <button
           className="side-action"
