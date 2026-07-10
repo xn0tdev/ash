@@ -1,3 +1,23 @@
+/* ── Tauri → Wails drag bridge ───────────────────────────────
+   The Ash frontend was authored for Tauri, which makes an element a window
+   drag handle via the `data-tauri-drag-region` ATTRIBUTE. Wails instead uses
+   the `--wails-draggable` CSS PROPERTY (inherited by children). To run the
+   unmodified frontend on Wails, we bridge the two: every element carrying the
+   Tauri attribute gets the Wails drag property. Wails' value is inherited, so
+   we also force `no-drag` on interactive children (buttons/inputs/links) so a
+   click on a control doesn't start a window drag. */
+[data-tauri-drag-region] {
+  --wails-draggable: drag;
+}
+button,
+input,
+select,
+textarea,
+a,
+[data-tauri-drag-region] [role="button"] {
+  --wails-draggable: no-drag;
+}
+
 :root {
   color-scheme: dark;
   /* Palette vars are set at runtime by applyAppTheme(); these are fallbacks. */
