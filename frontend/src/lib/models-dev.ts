@@ -6,6 +6,8 @@
 // { id, name, attachment, modalities: { input: [...] }, limit: { context } }.
 // Provider logos live at https://models.dev/logos/<provider>.svg.
 
+import { brandLogoDataUri } from "./brand-logos";
+
 export interface ModelInfo {
   /** models.dev bare model id, e.g. "claude-opus-4-5". */
   id: string;
@@ -183,22 +185,25 @@ function brandOfFamily(family: string): string | null {
   return null;
 }
 
-/** Brand provider id for a model's API id (via the catalog's family), or null.
- * Public so startup can prefetch brand logos for the user's configured models
- * before any picker renders. Falls back to a name-based heuristic if the
- * catalog row has no family (some resellers omit it) so e.g. a "grok-4.5"
- * model id still resolves to xAI even when the matched row is family-less. */
+/** Brand provider id for a model's API id. Resolves the model's family from
+ * the loaded catalog when available, and falls back to a name/id heuristic so
+ * a brand is returned even before the catalog finishes loading (the inlined
+ * logos then paint on the first frame). Public so startup can prefetch brand
+ * logos for the user's configured models before any picker renders. */
 export function brandForModelId(modelId: string): string | null {
+  // Heuristic first — works with zero network/catalog, from the id/name stem.
+  // The family prefixes double as id stems (grok-, glm-, kimi-, …).
+  const hayId = modelId.toLowerCase();
+  for (const { prefix, brand } of FAMILY_BRAND) {
+    if (hayId === prefix || hayId.includes(prefix + "-") || hayId.includes("/" + prefix))
+      return brand;
+  }
+  // Catalog lookup gives the authoritative family (handles ids that don't
+  // contain the family stem, e.g. "o3" → openai via catalog family "o").
   const info = lookupModel(modelId);
   if (info) {
     const b = brandOfFamily(info.family);
     if (b) return b;
-  }
-  // Heuristic on the id/name when the catalog match had no family — the
-  // family prefixes double as id/name stems (grok-, glm-, kimi-, …).
-  const hay = `${modelId} ${info?.name ?? ""}`.toLowerCase();
-  for (const { prefix, brand } of FAMILY_BRAND) {
-    if (hay.includes(prefix)) return brand;
   }
   return info ? info.provider : null;
 }
@@ -227,11 +232,23 @@ export function prefetchLogos(urls: Iterable<string>): void {
 /** The stored logo, or a live one resolved from the loaded catalog — keyed
  * off the model's FAMILY → its canonical brand, so the icon is the model's own
  * mark (GLM→Z.AI, Kimi→Moonshot, Minimax→MiniMax, Claude→Anthropic, …) rather
- * than whichever reseller provider hosted the lookup hit. */
+ * than whichever reseller provider hosted the lookup hit. Inlined brand
+ * logos (brand-logos.ts) are returned as data: URIs so the <img> paints on
+ * the first frame with zero network and no flash; unknown brands fall back to
+ * the models.dev URL (still prefetched at startup). */
 export function modelLogo(model: { modelId: string; logo?: string }): string | undefined {
+  // Resolve the brand FIRST (inlined data URI, instant + the model's own
+  // mark), and only fall back to a stored `logo` if the brand is unknown.
+  // The stored logo was auto-saved as the reseller provider URL in older
+  // builds (e.g. an OpenRouter URL for a Grok model), so honoring it first
+  // kept showing the reseller icon even after the brand fix.
+  const brand = brandForModelId(model.modelId);
+  if (brand) {
+    const inlined = brandLogoDataUri(brand);
+    if (inlined) return inlined;
+    return providerLogo(brand);
+  }
   if (model.logo) return model.logo;
   const info = lookupModel(model.modelId);
-  if (!info) return undefined;
-  const brand = brandOfFamily(info.family);
-  return brand ? providerLogo(brand) : providerLogo(info.provider);
+  return info ? providerLogo(info.provider) : undefined;
 }
