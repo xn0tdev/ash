@@ -1,15 +1,22 @@
-/* Update button — blue filled capsule with white "Update" text. Lives in the
-   titlebar as a normal flex item, BEFORE the title. Never use bare
-   position:absolute here without a positioned ancestor on .main-head — that
-   is what sent the badge into the chat pane on the previous build. */
+/* Update button — blue filled capsule, white "Update" text.
+   Absolutely positioned inside .main-head so the TITLE stays in place
+   (flex layout ignores the badge). Difference from the broken build:
+   .main-head is always position:relative, so this never escapes into
+   the chat pane. */
 .main-head {
-  position: relative; /* anchor for anything absolute inside the titlebar */
+  position: relative; /* required anchor for .update-badge */
 }
 .update-badge {
-  flex-shrink: 0;
+  position: absolute;
+  top: 50%;
+  /* Sit near the left edge of the titlebar, slightly toward the sidebar
+     (just a few px of the main-head inset). Out of the flex flow so the
+     title's natural padding-left is untouched — the text no longer jumps. */
+  left: 6px;
+  transform: translateY(-50%);
+  z-index: 6;
   height: 24px;
   padding: 0 12px;
-  margin-right: 10px;
   border: none;
   border-radius: 999px; /* capsule */
   background: #2563eb;
@@ -18,6 +25,13 @@
   letter-spacing: 0.01em;
   cursor: default;
   transition: filter 0.12s ease;
+  user-select: none;
+}
+/* Sidebar closed: title pads to 44px for the toggle. Keep the badge just
+   after that toggle (app-toggle is 28px @ left 8 of the app), so it still
+   sits to the left of the title without covering it. */
+.main-head.with-toggle .update-badge {
+  left: 40px;
 }
 .update-badge:hover {
   filter: brightness(1.12);

@@ -63,8 +63,11 @@ export default function TitleBar({
       className={`main-head${sidebarOpen ? "" : " with-toggle"}`}
       data-tauri-drag-region
     >
+      {/* Absolute — out of the flex flow so the title keeps its natural left
+          position. Only rendered when an update is available. */}
       {showUpdateBadge && (
         <button
+          type="button"
           className="update-badge"
           title="A new version of Ash is available"
           onClick={onUpdate}
