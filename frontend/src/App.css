@@ -68,8 +68,8 @@
 }
 
 .wc-btn:hover {
-  background: var(--hover);
-  color: #fff;
+  background: transparent;
+  color: var(--text);
 }
 
 .wc-close:hover {

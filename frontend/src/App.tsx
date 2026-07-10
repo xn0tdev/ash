@@ -23,7 +23,7 @@ export default function App() {
       cursorBlink: true,
       cursorStyle: "bar",
       fontFamily: 'Consolas, "Cascadia Mono", monospace',
-      fontSize: 13,
+      fontSize: 15,
       theme: {
         background: "#0a0a0a",
         foreground: "#ececec",
