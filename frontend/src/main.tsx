@@ -3,6 +3,7 @@ import App from "./App";
 import ErrorBoundary from "./ErrorBoundary";
 import { applyAppTheme, applyUiScale, getSettings, loadSettings } from "./lib/settings";
 import { loadChats } from "./lib/chat-store";
+import { loadModelsDev } from "./lib/models-dev";
 
 // UI font (app chrome). Geist Mono / JetBrains Mono below stay for the terminal.
 import "@fontsource/inter/400.css";
@@ -117,6 +118,10 @@ async function start() {
   // font loading can begin immediately, overlapping the disk reads.
   const settingsReady = loadSettings();
   const chatsReady = loadChats().catch(() => {});
+  // Preload the models.dev catalog alongside the disk reads so provider logos
+  // are resolved by the time an agent pane opens — without this the model
+  // picker's icons appeared a beat late and popped in.
+  const modelsReady = loadModelsDev().catch(() => {});
   // Terminals measure cell size at creation — the mono font must be in first.
   // Load a Cyrillic sample too so that subset is ready before any RU text.
   // Preload EVERY selectable terminal mono face (not just the default) so that
@@ -152,7 +157,7 @@ async function start() {
 
   // Block the first render only on what it truly needs: the restored tabs and
   // the terminal fonts (both already in flight, overlapping each other).
-  await Promise.all([chatsReady, fontsReady]);
+  await Promise.all([chatsReady, fontsReady, modelsReady]);
 
   // No StrictMode: its double-mounted effects would spawn every PTY twice.
   ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
