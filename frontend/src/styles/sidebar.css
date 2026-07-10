@@ -182,6 +182,40 @@
   color: var(--text);
 }
 
+.projects-header {
+  padding-top: 22px;
+  padding-bottom: 7px;
+}
+
+.projects-header .side-header-title {
+  color: color-mix(in srgb, var(--text) 72%, var(--faint));
+  font-size: 12.5px;
+  font-weight: 560;
+  letter-spacing: -0.01em;
+}
+
+.project-collapse {
+  opacity: 0;
+  transform: translateY(1px);
+  pointer-events: none;
+  transition: opacity 0.12s ease, color 0.1s ease, transform 0.12s ease;
+}
+
+.projects-header:hover .project-collapse:not(:disabled),
+.projects-header:focus-within .project-collapse:not(:disabled) {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.project-collapse.closed svg {
+  transform: rotate(-90deg);
+}
+
+.project-collapse:disabled {
+  opacity: 0;
+}
+
 .ws-diff {
   display: inline-flex;
   align-items: center;

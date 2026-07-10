@@ -569,6 +569,25 @@ export default function Sidebar({
     pinned.filter((p) => p.type === "tab").map((p) => p.id),
   );
 
+  const projectIds = workspaces
+    .filter((ws) => tabs.some((t) => t.workspaceId === ws.id && !pinnedTabIds.has(t.id)))
+    .map((ws) => ws.id);
+  const allProjectsCollapsed =
+    projectIds.length > 0 && projectIds.every((id) => collapsedWs.has(id));
+  const toggleAllProjects = () => {
+    setCollapsedWs((prev) => {
+      const next = new Set(prev);
+      if (allProjectsCollapsed) projectIds.forEach((id) => next.delete(id));
+      else projectIds.forEach((id) => next.add(id));
+      try {
+        localStorage.setItem("ash.wsCollapsed", JSON.stringify([...next]));
+      } catch {
+        // best-effort persistence
+      }
+      return next;
+    });
+  };
+
   const looseTabs = tabs.filter(
     (t) =>
       !pinnedTabIds.has(t.id) &&
@@ -695,9 +714,19 @@ export default function Sidebar({
         className={`side-scroll${canUp ? " can-up" : ""}${canDown ? " can-down" : ""}`}
         ref={scrollRef}
       >
-        <div className="side-header">
-          <span>Workspaces</span>
+        <div className="side-header projects-header">
+          <span className="side-header-title">Projects</span>
           <span className="side-header-actions">
+            <button
+              className={`side-add project-collapse${allProjectsCollapsed ? " closed" : ""}`}
+              title={allProjectsCollapsed ? "Expand all projects" : "Collapse all projects"}
+              onClick={toggleAllProjects}
+              disabled={projectIds.length === 0}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
             <button
               className="side-add"
               title="Close all terminals & chats"
