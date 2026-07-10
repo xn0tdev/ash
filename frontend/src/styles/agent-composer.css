@@ -575,19 +575,6 @@
   filter: grayscale(1) invert(1);
   opacity: 0.7;
 }
-/* Each option (logo + name) eases in together when the model picker opens, so
-   a logo that resolves a beat late doesn't pop in separately from its label. */
-.agent-menu button {
-  animation: modelOptIn 0.18s ease;
-}
-@keyframes modelOptIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
 .agent-hero .agent-composer {
   width: 580px;
   max-width: 92%;
