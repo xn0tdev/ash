@@ -129,7 +129,7 @@
   flex-shrink: 0;
   border: none;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.1);
   cursor: default;
   transition: background-color 0.12s ease;
 }
@@ -141,7 +141,7 @@
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: var(--faint);
+  background: var(--muted);
   transition: transform 0.12s ease, background-color 0.12s ease;
 }
 
@@ -179,42 +179,28 @@
 
 .settings-search-wrap {
   position: relative;
-  z-index: 20;
-  width: 100%;
-  margin: 0 0 34px;
+  z-index: 50;
+  margin-top: 10px;
+  margin-bottom: 12px;
 }
 
 .settings-search {
   position: relative;
   z-index: 2;
-  height: 36px;
+  height: 32px;
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 0 10px 0 12px;
-  border-radius: 12px;
+  gap: 8px;
+  padding: 0 8px 0 10px;
+  border-radius: 10px;
   corner-shape: squircle;
-  background: color-mix(in srgb, var(--bg) 58%, var(--surface));
+  background: var(--hover);
   color: var(--faint);
-  transition: border-radius 0.12s ease, background-color 0.1s ease;
-}
-
-.settings-search.open {
-  border-radius: 12px 12px 0 0;
-  background: color-mix(in srgb, var(--bg) 52%, var(--surface));
-  animation: settingsSearchTriggerOpen 0.16s cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-@keyframes settingsSearchTriggerOpen {
-  from {
-    transform: translateY(1px);
-  }
-  to {
-    transform: translateY(0);
-  }
+  transition: background-color 0.1s ease;
 }
 
 .settings-search:focus-within {
+  background: color-mix(in srgb, var(--hover) 60%, var(--raise));
   color: var(--muted);
 }
 
@@ -235,10 +221,10 @@
 .settings-search-clear {
   display: grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   border: none;
-  border-radius: 8px;
+  border-radius: 7px;
   corner-shape: squircle;
   background: transparent;
   color: var(--faint);
@@ -249,32 +235,34 @@
 }
 
 .settings-search-results {
-  position: absolute;
-  left: 0;
-  right: 0;
-  /* Same trick as .ash-select-menu: the popup starts ON the trigger rect, then
-     grows downward. The real input stays above it (z-index:2); this element
-     provides the one-piece expanding background + list below. */
-  top: 0;
-  z-index: 1;
-  padding: 40px 6px 6px;
+  position: fixed;
+  z-index: 90;
+  /* Float to the right of the nav search input — start at the input's top,
+     extend into the content area. Width is generous so labels + category fit. */
+  left: 220px;
+  top: 62px;
+  width: 360px;
+  max-width: calc(100vw - 240px);
+  padding: 5px;
   border-radius: 12px;
   corner-shape: squircle;
-  background: color-mix(in srgb, var(--bg) 52%, var(--surface));
-  box-shadow: 0 18px 44px color-mix(in srgb, var(--shadow) 26%, transparent);
+  background: var(--raise);
+  box-shadow: 0 14px 40px color-mix(in srgb, var(--shadow) 32%, transparent);
   transform-origin: top left;
   overflow: hidden;
-  animation: settingsSearchSelectIn 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: settingsSearchSelectIn 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @keyframes settingsSearchSelectIn {
   from {
     opacity: 0;
-    clip-path: inset(0 0 calc(100% - 36px) 0);
+    clip-path: inset(0 0 calc(100% - 0px) 0);
+    transform: scaleY(0.6);
   }
   to {
     opacity: 1;
     clip-path: inset(0 0 0 0);
+    transform: scaleY(1);
   }
 }
 
@@ -743,7 +731,7 @@
   border: none;
   border-radius: 9px;
   corner-shape: squircle;
-  background: var(--surface);
+  background: color-mix(in srgb, var(--bg) 55%, var(--surface));
   color: var(--text);
   font-family: inherit;
   font-size: 12.5px;
@@ -844,13 +832,13 @@
   width: 92px;
   height: 32px;
   border-radius: 10px;
-  background: var(--surface);
+  background: color-mix(in srgb, var(--bg) 55%, var(--surface));
   flex-shrink: 0;
   transition: background-color 0.1s ease;
   overflow: hidden;
 }
 .stepper:hover {
-  background: var(--raise);
+  background: color-mix(in srgb, var(--bg) 40%, var(--raise));
 }
 .stepper > input {
   flex: 1;

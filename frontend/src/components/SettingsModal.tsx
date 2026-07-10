@@ -556,6 +556,71 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
           </svg>
           Back
         </button>
+        <div className="settings-search-wrap" data-tauri-drag-region>
+          <div className={`settings-search${searchQuery && searchActive ? " open" : ""}`}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="7" />
+              <path d="m20 20-3.5-3.5" />
+            </svg>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search"
+              spellCheck={false}
+              onFocus={() => setSearchActive(true)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape" && search) {
+                  e.stopPropagation();
+                  setSearch("");
+                  setSearchActive(false);
+                } else if (e.key === "ArrowDown" && visibleSearchResults.length) {
+                  e.preventDefault();
+                  setSearchActive(true);
+                  setSearchIndex((i) => Math.min(visibleSearchResults.length - 1, i + 1));
+                } else if (e.key === "ArrowUp" && visibleSearchResults.length) {
+                  e.preventDefault();
+                  setSearchIndex((i) => Math.max(0, i - 1));
+                } else if (e.key === "Enter" && visibleSearchResults[searchIndex]) {
+                  e.preventDefault();
+                  jumpToSearchResult(visibleSearchResults[searchIndex]);
+                }
+              }}
+            />
+            {search && (
+              <button type="button" className="settings-search-clear" onClick={() => { setSearch(""); setSearchActive(false); }} aria-label="Clear search">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+          {searchQuery && searchActive && (
+            <div className="settings-search-results">
+              {visibleSearchResults.length ? (
+                visibleSearchResults.map((item, i) => (
+                  <button
+                    key={`${item.cat}:${item.label}`}
+                    type="button"
+                    className={`settings-search-result${i === searchIndex ? " active" : ""}`}
+                    style={{ "--i": i } as React.CSSProperties}
+                    onMouseEnter={() => setSearchIndex(i)}
+                    onClick={() => jumpToSearchResult(item)}
+                  >
+                    <span className="settings-search-result-main">
+                      <span>{item.label}</span>
+                      <small>{item.hint}</small>
+                    </span>
+                    <span className="settings-search-result-cat">
+                      {CATEGORIES.find((c) => c.id === item.cat)?.label}
+                    </span>
+                  </button>
+                ))
+              ) : (
+                <div className="settings-search-empty">No settings found</div>
+              )}
+            </div>
+          )}
+        </div>
         <div className="settings-cats">
           {CATEGORIES.map((c) => (
             <button
@@ -571,71 +636,6 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
 
       <div className="settings-content" data-tauri-drag-region>
           <div className="settings-inner" data-tauri-drag-region>
-            <div className="settings-search-wrap" data-tauri-drag-region>
-              <div className={`settings-search${searchQuery && searchActive ? " open" : ""}`}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <circle cx="11" cy="11" r="7" />
-                  <path d="m20 20-3.5-3.5" />
-                </svg>
-                <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search settings…"
-                  spellCheck={false}
-                  onFocus={() => setSearchActive(true)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Escape" && search) {
-                      e.stopPropagation();
-                      setSearch("");
-                      setSearchActive(false);
-                    } else if (e.key === "ArrowDown" && visibleSearchResults.length) {
-                      e.preventDefault();
-                      setSearchActive(true);
-                      setSearchIndex((i) => Math.min(visibleSearchResults.length - 1, i + 1));
-                    } else if (e.key === "ArrowUp" && visibleSearchResults.length) {
-                      e.preventDefault();
-                      setSearchIndex((i) => Math.max(0, i - 1));
-                    } else if (e.key === "Enter" && visibleSearchResults[searchIndex]) {
-                      e.preventDefault();
-                      jumpToSearchResult(visibleSearchResults[searchIndex]);
-                    }
-                  }}
-                />
-                {search && (
-                  <button type="button" className="settings-search-clear" onClick={() => { setSearch(""); setSearchActive(false); }} aria-label="Clear search">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
-                      <path d="M18 6 6 18M6 6l12 12" />
-                    </svg>
-                  </button>
-                )}
-              </div>
-              {searchQuery && searchActive && (
-                <div className="settings-search-results">
-                  {visibleSearchResults.length ? (
-                    visibleSearchResults.map((item, i) => (
-                      <button
-                        key={`${item.cat}:${item.label}`}
-                        type="button"
-                        className={`settings-search-result${i === searchIndex ? " active" : ""}`}
-                        style={{ "--i": i } as React.CSSProperties}
-                        onMouseEnter={() => setSearchIndex(i)}
-                        onClick={() => jumpToSearchResult(item)}
-                      >
-                        <span className="settings-search-result-main">
-                          <span>{item.label}</span>
-                          <small>{item.hint}</small>
-                        </span>
-                        <span className="settings-search-result-cat">
-                          {CATEGORIES.find((c) => c.id === item.cat)?.label}
-                        </span>
-                      </button>
-                    ))
-                  ) : (
-                    <div className="settings-search-empty">No settings found</div>
-                  )}
-                </div>
-              )}
-            </div>
             {cat === "appearance" && (
               <section>
                 <h3>Appearance</h3>
