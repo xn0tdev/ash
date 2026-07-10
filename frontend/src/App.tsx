@@ -22,7 +22,7 @@ export default function App() {
       allowProposedApi: true,
       cursorBlink: true,
       cursorStyle: "bar",
-      fontFamily: '"Geist Mono", Consolas, monospace',
+      fontFamily: 'Consolas, "Cascadia Mono", monospace',
       fontSize: 13,
       theme: {
         background: "#0a0a0a",
