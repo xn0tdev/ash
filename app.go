@@ -17,6 +17,7 @@ type App struct {
 	git     *Git
 	tools   *Tools
 	sandbox *Sandbox
+	updater *Updater
 }
 
 func NewApp() *App {
@@ -26,13 +27,24 @@ func NewApp() *App {
 		git:     NewGit(),
 		tools:   NewTools(),
 		sandbox: NewSandbox(),
+		updater: NewUpdater(),
 	}
 }
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	a.pty.startup(ctx)
+	a.updater.startup(ctx)
 	storeToolsCtx(ctx)
+}
+
+// AppInfo exposes build metadata to the frontend (About section, update check).
+// Version/Commit are set at build time via -ldflags; default to "dev"/"none".
+func (a *App) AppInfo() map[string]string {
+	return map[string]string{
+		"version": Version,
+		"commit":  Commit,
+	}
 }
 
 func (a *App) shutdown(ctx context.Context) {

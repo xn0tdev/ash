@@ -14,6 +14,8 @@ import SettingsModal from "./components/SettingsModal";
 import UtilityModal from "./components/UtilityModal";
 import SshModal from "./components/SshModal";
 import RunModal from "./components/RunModal";
+import UpdateModal from "./components/UpdateModal";
+import { onUpdateState, startAutoCheck } from "./lib/updater";
 import { AGENTS, AgentDef } from "./lib/agents";
 import { RunConfig, loadRuns, runCwd, saveRuns } from "./lib/runs";
 import { initPtyEvents, ptyKill } from "./lib/pty";
@@ -226,6 +228,8 @@ export default function App() {
   const [exMounted, setExMounted] = useState(false);
   const [exOpen, setExOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [updateOpen, setUpdateOpen] = useState(false);
+  const [updateAvailable, setUpdateAvailable] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [explorerSide, setExplorerSide] = useState(
     () => getSettings().explorerSide,
@@ -1219,6 +1223,14 @@ export default function App() {
     setActiveTabId(list[(idx + dir + list.length) % list.length].id);
   }, []);
 
+  // Self-update: subscribe to the updater store (drives the titlebar badge)
+  // and auto-check GitHub Releases once on startup (quietly, after a delay).
+  useEffect(() => {
+    const off = onUpdateState((s) => setUpdateAvailable(s.stage === "available"));
+    startAutoCheck();
+    return off;
+  }, []);
+
   // Session events (shell ready, OSC title, PTY exit, link clicks) → state.
   useEffect(() => {
     configureSessions({
@@ -1419,6 +1431,19 @@ export default function App() {
           <rect className="tgl-outline" x="6" y="8" width="4.5" height="8" rx="2" />
         </svg>
       </button>
+      {updateAvailable && (
+        <button
+          className="update-badge"
+          title="A new version of Ash is available"
+          onClick={() => setUpdateOpen(true)}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+            <path d="M21 3v6h-6" />
+          </svg>
+          Update
+        </button>
+      )}
       <div
         className={`rail${collapsed ? " collapsed" : ""}`}
         style={{ width: collapsed ? 0 : sidebarWidth }}
@@ -1527,6 +1552,7 @@ export default function App() {
         />
       )}
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
+      {updateOpen && <UpdateModal onClose={() => setUpdateOpen(false)} />}
       {confirmClose && (
         <div className={`modal-backdrop${confirmClosing ? " closing" : ""}`} onMouseDown={() => closeConfirm()}>
           <div className={`confirm-modal${confirmClosing ? " closing" : ""}`} onMouseDown={(e) => e.stopPropagation()}>

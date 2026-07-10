@@ -1,4 +1,21 @@
+# Build output
 build/bin
+build/windows/installer/tmp/
+
+# Frontend
 node_modules
 frontend/dist
-build/windows/installer/tmp/
+frontend/package.json.md5
+
+# Local binaries (never commit built exes)
+*.exe
+*.exe~
+
+# Local dev tool configs
+slate.json
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

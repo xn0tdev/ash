@@ -44,6 +44,7 @@ import "./styles/explorer.css";
 import "./styles/context-menu.css";
 import "./styles/toast.css";
 import "./styles/modals.css";
+import "./styles/update.css";
 import "./styles/settings.css";
 import "./styles/xterm.css";
 

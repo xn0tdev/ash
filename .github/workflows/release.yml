@@ -1,0 +1,62 @@
+name: Release
+
+# Triggered by a version tag (vMAJOR.MINOR.PATCH). Builds Ash.exe with the
+# version baked in via ldflags, then publishes a GitHub Release with Ash.exe
+# attached — that asset is what the in-app self-updater downloads.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.13.0
+
+      - name: Resolve version
+        id: ver
+        shell: bash
+        run: |
+          # tag = vX.Y.Z → version = X.Y.Z
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Version: $VERSION"
+
+      - name: Build Ash.exe (versioned)
+        run: |
+          wails build -ldflags "-X main.Version=${{ steps.ver.outputs.version }} -X main.Commit=${{ github.sha }}"
+
+      - name: Stage asset
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path staging | Out-Null
+          Copy-Item "build\bin\Ash.exe" "staging\Ash.exe"
+          Write-Host "Asset: $((Get-Item 'staging\Ash.exe').Length) bytes"
+
+      - name: Create release + upload asset
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: staging/Ash.exe
+          fail_on_unmatched_files: true

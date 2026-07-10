@@ -9,6 +9,13 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/windows"
 )
 
+// Build-time vars (set via -ldflags "-X main.Version=... -X main.Commit=...").
+// Defaults let a plain `go build` / `wails build` run without flags.
+var (
+	Version = "dev"
+	Commit   = "none"
+)
+
 //go:embed all:frontend/dist
 var assets embed.FS
 
@@ -40,12 +47,13 @@ func main() {
 		OnStartup:        app.startup,
 		OnShutdown:       app.shutdown,
 		Bind: []interface{}{
-			app,        // App (root, no methods yet beyond lifecycle)
-			app.pty,    // PtySpawn / PtyWrite / PtyResize / PtyKill
-			app.fs,     // ReadText / WriteText / DeletePath / ListDir / HomeDir
-			app.git,    // Branch / Status / DiffStat
-			app.tools,  // DetectBins / ResolveBash / FindEditors / SshHosts / OpenIn
+			app,         // App (root) — AppInfo / Version / Commit
+			app.pty,     // PtySpawn / PtyWrite / PtyResize / PtyKill
+			app.fs,      // ReadText / WriteText / DeletePath / ListDir / HomeDir
+			app.git,     // Branch / Status / DiffStat
+			app.tools,   // DetectBins / ResolveBash / FindEditors / SshHosts / OpenIn
 			app.sandbox, // Copy / Changes / Merge / Remove (stubbed for now)
+			app.updater, // CheckUpdate / DownloadUpdate / ApplyUpdate / Restart
 		},
 		Windows: &windows.Options{
 			WebviewIsTransparent: false,

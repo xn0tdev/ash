@@ -8,6 +8,8 @@ import * as Git from "../../wailsjs/go/main/Git";
 import * as Tools from "../../wailsjs/go/main/Tools";
 import * as Sandbox from "../../wailsjs/go/main/Sandbox";
 import * as Pty from "../../wailsjs/go/main/Pty";
+import * as Updater from "../../wailsjs/go/main/Updater";
+import * as AppBinding from "../../wailsjs/go/main/App";
 
 // invoke<T>(cmd, args) → Promise<T>. Args is a flat object (Tauri convention);
 // Wails binding methods take positional args, so each case maps the named
@@ -66,6 +68,19 @@ export function invoke<T = unknown>(cmd: string, args?: Record<string, unknown>)
       return Pty.PtyResize(args?.id as string, args?.cols as number, args?.rows as number) as Promise<T>;
     case "pty_kill":
       return Pty.PtyKill(args?.id as string) as Promise<T>;
+
+    // ── updater (self-update against GitHub Releases) ────────
+    case "check_update":
+      return Updater.CheckUpdate() as Promise<T>;
+    case "download_update":
+      return Updater.DownloadUpdate() as Promise<T>;
+    case "apply_update":
+      return Updater.ApplyUpdate(args?.path as string) as Promise<T>;
+    case "restart_app":
+      return Updater.Restart() as Promise<T>;
+    case "app_info":
+      // AppInfo is on the root App binding, not Updater.
+      return AppBinding.AppInfo() as unknown as Promise<T>;
 
     // ── sandbox (stubbed — returns the error Go sends) ───────
     case "sandbox_copy":
