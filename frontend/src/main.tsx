@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import ErrorBoundary from "./ErrorBoundary";
@@ -49,24 +50,42 @@ import "./styles/settings.css";
 import "./styles/xterm.css";
 
 
-// macOS uses native traffic-light window controls (see tauri.macos.conf.json),
-// so tag the root: the layout reserves their top-left space and TitleBar hides
-// our custom Windows-style buttons. A dev-only "Mac preview" (Ctrl+Shift+M)
-// forces the same layout on Windows and draws SIMULATED traffic lights so the
-// Mac look can be eyeballed without a Mac. UA sniffing is reliable here.
+// macOS uses native traffic-light window controls, so tag the root: the
+// layout reserves their top-left space and TitleBar hides our custom
+// Windows-style buttons. UA sniffing is reliable here.
 const realMac = navigator.userAgent.includes("Macintosh");
-const macPreview = localStorage.getItem("ash.macPreview") === "1";
-if (realMac || macPreview) document.documentElement.classList.add("mac");
-if (macPreview && !realMac) document.documentElement.classList.add("mac-preview");
+if (realMac) document.documentElement.classList.add("mac");
 
-// Toggle the dev Mac-preview and reload so the one-shot detection above re-runs.
-window.addEventListener("keydown", (e) => {
-  if (e.ctrlKey && e.shiftKey && (e.key === "m" || e.key === "M")) {
-    e.preventDefault();
-    localStorage.setItem("ash.macPreview", macPreview ? "0" : "1");
-    location.reload();
+// Dev-only "Mac preview" (Ctrl+Shift+M) forces the Mac layout on Windows and
+// draws SIMULATED traffic lights so the Mac look can be eyeballed without a
+// Mac. This is a DEV toy — it must NEVER ship in a public release build
+// (channel === "release"), only in local/dev binaries. The channel comes from
+// the Go build var via AppInfo; until it resolves we assume dev so a local
+// `wails build` still works without flags.
+async function applyMacPreviewIfDev() {
+  let channel = "dev";
+  try {
+    const info = await invoke<Record<string, string>>("app_info");
+    channel = info?.channel ?? "dev";
+  } catch {
+    // binding not ready / shim missing — treat as dev (safe default for local).
   }
-});
+  if (channel === "release") return; // prod: no Mac-preview, no toggle.
+  const macPreview = localStorage.getItem("ash.macPreview") === "1";
+  if (macPreview) {
+    document.documentElement.classList.add("mac");
+    if (!realMac) document.documentElement.classList.add("mac-preview");
+  }
+  // Toggle the dev Mac-preview and reload so the detection above re-runs.
+  window.addEventListener("keydown", (e) => {
+    if (e.ctrlKey && e.shiftKey && (e.key === "m" || e.key === "M")) {
+      e.preventDefault();
+      localStorage.setItem("ash.macPreview", macPreview ? "0" : "1");
+      location.reload();
+    }
+  });
+}
+void applyMacPreviewIfDev();
 
 // Strip native `title` tooltips app-wide — desktop apps don't show them.
 function stripTitlesIn(el: Element) {

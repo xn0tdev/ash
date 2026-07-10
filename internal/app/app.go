@@ -13,8 +13,13 @@ import (
 // Build-time vars (set via -ldflags "-X ash-wails/internal/app.Version=...").
 // Defaults let a plain `go build` / `wails build` run without flags.
 var (
-	Version = "dev"
-	Commit  = "none"
+	Version      = "dev"
+	Commit       = "none"
+	// BuildChannel labels the build: "dev" for local/manual builds (the
+	// binary you run from build/bin), "release" for the tagged GitHub build
+	// that ships to users via the installer. Used to gate dev-only toys
+	// (e.g. the Ctrl+Shift+M Mac-preview) out of public releases.
+	BuildChannel = "dev"
 )
 
 // App is the root struct Wails binds to the frontend. Sub-systems (PTY, fs,
@@ -51,12 +56,14 @@ func (a *App) startup(ctx context.Context) {
 	storeToolsCtx(ctx)
 }
 
-// AppInfo exposes build metadata to the frontend (About section, update check).
-// Version/Commit are set at build time via -ldflags; default to "dev"/"none".
+// AppInfo exposes build metadata to the frontend (About section, update
+// check, dev-feature gating). Version/Commit/BuildChannel are set at build
+// time via -ldflags; default to "dev"/"none"/"dev".
 func (a *App) AppInfo() map[string]string {
 	return map[string]string{
 		"version": Version,
 		"commit":  Commit,
+		"channel": BuildChannel,
 	}
 }
 

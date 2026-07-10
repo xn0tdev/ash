@@ -42,9 +42,9 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Version: $VERSION"
 
-      - name: Build Ash.exe (versioned)
+      - name: Build Ash.exe (versioned, release channel)
         run: |
-          wails build -ldflags "-X ash-wails/internal/app.Version=${{ steps.ver.outputs.version }} -X ash-wails/internal/app.Commit=${{ github.sha }}"
+          wails build -ldflags "-X ash-wails/internal/app.Version=${{ steps.ver.outputs.version }} -X ash-wails/internal/app.Commit=${{ github.sha }} -X ash-wails/internal/app.BuildChannel=release"
 
       - name: Stage asset
         shell: pwsh
