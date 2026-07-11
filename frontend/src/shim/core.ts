@@ -69,6 +69,8 @@ export function invoke<T = unknown>(cmd: string, args?: Record<string, unknown>)
       return Pty.PtyResize(args?.id as string, args?.cols as number, args?.rows as number) as Promise<T>;
     case "pty_kill":
       return Pty.PtyKill(args?.id as string) as Promise<T>;
+    case "pty_foreground_process":
+      return Pty.PtyForegroundProcess(args?.id as string) as Promise<T>;
 
     // ── one-shot processes ───────────────────────────────────
     case "process_run":

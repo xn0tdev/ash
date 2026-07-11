@@ -32,6 +32,20 @@ export namespace app {
 	        this.status = source["status"];
 	    }
 	}
+	export class ForegroundProcess {
+	    name: string;
+	    pid: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ForegroundProcess(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.pid = source["pid"];
+	    }
+	}
 	export class ProcessOutput {
 	    code?: number;
 	    stdout: string;

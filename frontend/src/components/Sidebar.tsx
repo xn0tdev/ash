@@ -6,6 +6,7 @@ import { leaves } from "../lib/layout";
 import { AgentDef } from "../lib/agents";
 import { SectionToggles } from "../lib/settings";
 import { getAgentStatus, onAgentStatusChange } from "../lib/agent-status";
+import { getAgentForTerm, onAgentDetectChange } from "../lib/agent-detect";
 import {
   getBackgroundTerms,
   isBackgroundTerm,
@@ -26,6 +27,12 @@ interface SidebarProps {
   onRemoveWorkspace: (id: string) => void;
   onNewTabInWorkspace: (id: string) => void;
   onMoveTabToWorkspace: (tabId: string, wsId: string) => void;
+  onSplitMergeTab: (
+    srcTabId: string,
+    targetPaneId: string,
+    dir: "row" | "col",
+    placeBefore: boolean,
+  ) => void;
   onOpenBackgroundTerm: (id: string, title: string) => void;
   onKillBackgroundTerm: (id: string) => void;
   onOpenBgAgent: (id: string, name: string) => void;
@@ -61,6 +68,7 @@ import {
   AgentDoneChatIcon, BroomIcon, CloseSquareIcon, GearIcon, NewTabIcon,
   SearchIcon,
 } from "./sidebar/icons";
+import { AgentSingleIcon, AgentPairIcon } from "./sidebar/agent-icons";
 
 // Pick the tab-row icon by what the tab holds. A chat pane is the star of a
 // tab — when one is present (even in a "chat left, terminal right" split) show
@@ -74,7 +82,16 @@ function tabIcon(tab: Tab) {
     if (statuses.includes("done")) return <AgentDoneIcon />;
     return <AgentTabIcon />;
   }
-  // No chat: a single-leaf tab shows its own kind; a split falls back to term.
+  // Terminals with a detected CLI agent get that agent's brand logo instead of
+  // the generic terminal icon. Collect matches across every term leaf so a
+  // split holding two agents (claude | opencode) shows a paired avatar stack.
+  const termLeaves = ls.filter((l) => l.kind === "term");
+  const matched = termLeaves
+    .map((l) => getAgentForTerm(l.id)?.id)
+    .filter((id): id is string => !!id);
+  if (matched.length === 1) return <AgentSingleIcon id={matched[0]} />;
+  if (matched.length >= 2) return <AgentPairIcon ids={matched} />;
+  // No chat, no detected agent: a single-leaf tab shows its own kind.
   if (ls.length === 1) {
     if (ls[0].kind === "file") return <FileTabIcon />;
     if (ls[0].kind === "web") return <WebTabIcon />;
@@ -94,6 +111,7 @@ export default function Sidebar({
   onRemoveWorkspace,
   onNewTabInWorkspace,
   onMoveTabToWorkspace,
+  onSplitMergeTab,
   onOpenBackgroundTerm,
   onKillBackgroundTerm,
   onOpenBgAgent,
@@ -126,6 +144,10 @@ export default function Sidebar({
   // Re-render tab icons when an agent pane starts/finishes working.
   const [, bumpAgentStatus] = useState(0);
   useEffect(() => onAgentStatusChange(() => bumpAgentStatus((x) => x + 1)), []);
+  // Re-render tab icons when a CLI agent is detected/lost in a terminal so
+  // the brand logo appears without switching tabs.
+  const [, bumpAgentDetect] = useState(0);
+  useEffect(() => onAgentDetectChange(() => bumpAgentDetect((x) => x + 1)), []);
   // Agent-spawned background terminal sessions (collapsible group below).
   const [, bumpSessions] = useState(0);
   useEffect(() => onBackgroundTermsChange(() => bumpSessions((x) => x + 1)), []);
@@ -175,6 +197,12 @@ export default function Sidebar({
     y: number;
   } | null>(null);
   const [dropWs, setDropWs] = useState<string | null>(null);
+  // Drop target for drag-a-tab-onto-a-pane (split merge). dir + placeBefore
+  // describe which side the new pane lands on; the matching pane element gets
+  // a `split-drop-*` class to preview where the split will open.
+  const [dropPane, setDropPane] = useState<
+    { id: string; dir: "row" | "col"; placeBefore: boolean } | null
+  >(null);
   const [diff, setDiff] = useState<{ added: number; removed: number } | null>(
     null,
   );
@@ -317,8 +345,32 @@ export default function Sidebar({
     setEditingId(null);
   };
 
+  // Apply/clear the split-drop highlight on the pane under the cursor. Done
+  // in an effect (not inline in the drag handler) so React owns the class and
+  // we never leave a stale `split-drop-*` on an element after the drag ends.
+  useEffect(() => {
+    if (!dropPane) return;
+    const el = document.querySelector<HTMLElement>(
+      `[data-pane-id="${dropPane.id}"]`,
+    );
+    if (el) {
+      const side =
+        dropPane.dir === "row"
+          ? dropPane.placeBefore
+            ? "left"
+            : "right"
+          : dropPane.placeBefore
+            ? "top"
+            : "bottom";
+      el.classList.add(`split-drop-${side}`);
+      return () => el.classList.remove(`split-drop-${side}`);
+    }
+  }, [dropPane]);
+
   // Pointer-based drag (HTML5 DnD is unreliable in the WebView) — drag a tab
-  // onto the Pinned zone to pin it, or onto a workspace row to move it there.
+  // onto the Pinned zone to pin it, onto a workspace row to move it there, or
+  // onto another tab's pane to merge the two into a split (neither terminal
+  // resets; the PTY session survives the re-parent).
   const startTabDrag = (e: React.MouseEvent, tab: Tab) => {
     if (e.button !== 0 || editingId === tab.id) return;
     const startX = e.clientX;
@@ -333,10 +385,24 @@ export default function Sidebar({
     const apply = () => {
       raf = 0;
       setTabDrag({ id: tab.id, title: tab.title, x: lastX, y: lastY });
-      const wsRow = document
-        .elementFromPoint(lastX, lastY)
-        ?.closest<HTMLElement>("[data-ws-id]");
+      const el = document.elementFromPoint(lastX, lastY);
+      const wsRow = el?.closest<HTMLElement>("[data-ws-id]");
       setDropWs(wsRow?.dataset.wsId ?? null);
+      // Pane drop → split merge. Detect which half of the pane the cursor is in
+      // so the new terminal opens on the side the user pointed at.
+      const pane = el?.closest<HTMLElement>("[data-pane-id]");
+      if (pane) {
+        const rect = pane.getBoundingClientRect();
+        const relX = (lastX - rect.left) / rect.width - 0.5;
+        const relY = (lastY - rect.top) / rect.height - 0.5;
+        if (Math.abs(relX) > Math.abs(relY)) {
+          setDropPane({ id: pane.dataset.paneId!, dir: "row", placeBefore: relX < 0 });
+        } else {
+          setDropPane({ id: pane.dataset.paneId!, dir: "col", placeBefore: relY < 0 });
+        }
+      } else {
+        setDropPane(null);
+      }
     };
     const move = (ev: MouseEvent) => {
       if (!started) {
@@ -355,26 +421,39 @@ export default function Sidebar({
       if (raf) cancelAnimationFrame(raf);
       if (started) {
         const el = document.elementFromPoint(ev.clientX, ev.clientY);
-        const wsId = el?.closest<HTMLElement>("[data-ws-id]")?.dataset.wsId;
-        if (wsId) {
-          onMoveTabToWorkspace(tab.id, wsId);
-          setCollapsedWs((prev) => {
-            if (!prev.has(wsId)) return prev;
-            const next = new Set(prev);
-            next.delete(wsId);
-            try {
-              localStorage.setItem("ash.wsCollapsed", JSON.stringify([...next]));
-            } catch {
-              // best-effort persistence
-            }
-            return next;
-          });
-        } else if (el?.closest(".pin-zone")) {
-          onPin({ type: "tab", id: tab.id });
+        // Pane drop wins over workspace/pin — splitting is the more specific
+        // target (a pane is never inside a workspace row).
+        const pane = el?.closest<HTMLElement>("[data-pane-id]");
+        if (pane && pane.dataset.paneId) {
+          const rect = pane.getBoundingClientRect();
+          const relX = (ev.clientX - rect.left) / rect.width - 0.5;
+          const relY = (ev.clientY - rect.top) / rect.height - 0.5;
+          const dir: "row" | "col" = Math.abs(relX) > Math.abs(relY) ? "row" : "col";
+          const placeBefore = dir === "row" ? relX < 0 : relY < 0;
+          onSplitMergeTab(tab.id, pane.dataset.paneId, dir, placeBefore);
+        } else {
+          const wsId = el?.closest<HTMLElement>("[data-ws-id]")?.dataset.wsId;
+          if (wsId) {
+            onMoveTabToWorkspace(tab.id, wsId);
+            setCollapsedWs((prev) => {
+              if (!prev.has(wsId)) return prev;
+              const next = new Set(prev);
+              next.delete(wsId);
+              try {
+                localStorage.setItem("ash.wsCollapsed", JSON.stringify([...next]));
+              } catch {
+                // best-effort persistence
+              }
+              return next;
+            });
+          } else if (el?.closest(".pin-zone")) {
+            onPin({ type: "tab", id: tab.id });
+          }
         }
       }
       setTabDrag(null);
       setDropWs(null);
+      setDropPane(null);
       setDragPin(false);
     };
     window.addEventListener("mousemove", move);
@@ -506,6 +585,14 @@ export default function Sidebar({
   const renderTab = (tab: Tab, nested: boolean) => {
     // An agent chat acts as a folder for the sessions it spawned.
     const ls = leaves(tab.root);
+    const leafCount = ls.length;
+    // Detected CLI agents across this tab's terminal leaves — drives the
+    // brand-avatar icon and suppresses the redundant pane-count badge when
+    // the avatars already convey multiplicity.
+    const matchedAgents = ls
+      .filter((l) => l.kind === "term")
+      .map((l) => getAgentForTerm(l.id)?.id)
+      .filter((id): id is string => !!id);
     const ownedSessions =
       ls.length === 1 && ls[0].kind === "agent"
         ? sessions.filter((s) => s.ownerId === ls[0].id)
@@ -545,6 +632,9 @@ export default function Sidebar({
             />
           ) : (
             <span className="tab-title">{tab.title}</span>
+          )}
+          {leafCount > 1 && matchedAgents.length === 0 && (
+            <span className="tab-pane-count" title={`${leafCount} panes`}>{leafCount}</span>
           )}
           <button
             className="tab-close"

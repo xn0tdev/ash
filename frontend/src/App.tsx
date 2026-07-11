@@ -38,12 +38,14 @@ import {
   isSessionUsed,
   setSpawnOptions,
 } from "./lib/term";
+import { startAgentDetection, stopAgentDetection, triggerDetect, clearAgent, getAgentForTerm, onAgentDetectChange, agentTabTitle, agentCombinedTitle } from "./lib/agent-detect";
 import { getSettings, onSettingsChange, updateSettings } from "./lib/settings";
 import {
   Leaf,
   PaneNode,
   SplitDir,
   firstLeaf,
+  insertSibling,
   leafIds,
   leaves,
   removeLeaf,
@@ -68,6 +70,7 @@ import {
 } from "./lib/persistence";
 import type { WorkspaceState } from "./lib/persistence";
 import { makeTab, paneRect, basename, prettyTitle } from "./lib/tab-utils";
+import { getSession } from "./lib/term";
 
 initPtyEvents();
 
@@ -1032,6 +1035,64 @@ export default function App() {
   // Stable "close with kill" for PaneLayout (memo needs one identity).
   const closePaneKill = useCallback((paneId: string) => closePane(paneId, true), [closePane]);
 
+  // Drag a sidebar tab onto another tab's pane → merge them into one split.
+  // The dragged tab's whole subtree (often a single terminal) becomes a sibling
+  // of the drop target pane; the source tab is removed. Neither terminal
+  // resets: its PTY+xterm session survives the move (ensureSession re-parents
+  // the existing container + refits), so work in progress keeps going at the
+  // new size. `placeBefore` = new pane sits on the left/top of the split.
+  const splitMergeTab = useCallback(
+    (
+      srcTabId: string,
+      targetPaneId: string,
+      dir: SplitDir,
+      placeBefore: boolean,
+    ) => {
+      const src = tabsRef.current.find((t) => t.id === srcTabId);
+      const dst = tabsRef.current.find((t) => leafIds(t.root).includes(targetPaneId));
+      if (!src || !dst) return;
+      // Dropped a tab onto its OWN pane (the common case — the grabbed tab is
+      // the active one, so its pane is the only visible drop target). Open a
+      // fresh terminal beside it instead of merging: same result as the
+      // keyboard split, aimed where the user dropped.
+      if (src.id === dst.id) {
+        const freshId = crypto.randomUUID();
+        const newRoot = insertSibling(
+          dst.root,
+          targetPaneId,
+          dir,
+          termLeaf(freshId),
+          placeBefore,
+        );
+        setTabs((ts) =>
+          ts.map((t) =>
+            t.id === dst.id
+              ? { ...t, root: newRoot, activePane: freshId }
+              : t,
+          ),
+        );
+        return;
+      }
+      const newRoot = insertSibling(dst.root, targetPaneId, dir, src.root, placeBefore);
+      const focusId = firstLeaf(src.root);
+      setTabs((ts) => {
+        const merged = ts.map((t) =>
+          t.id === dst.id
+            ? {
+                ...t,
+                root: newRoot,
+                activePane: focusId,
+              }
+            : t,
+        );
+        return merged.filter((t) => t.id !== srcTabId);
+      });
+      // If the dragged tab was active, follow the work into its new home.
+      if (activeTabIdRef.current === srcTabId) setActiveTabId(dst.id);
+    },
+    [],
+  );
+
   // Sidebar close button: agent chats get a confirm modal first.
   const requestCloseTab = useCallback((tabId: string) => {
     const tab = tabsRef.current.find((t) => t.id === tabId);
@@ -1233,10 +1294,16 @@ export default function App() {
   useEffect(() => {
     const off = onUpdateState((s) => setUpdateAvailable(s.stage === "available"));
     startAutoCheck();
+    // CLI-agent detection polls each terminal's foreground process so the
+    // sidebar can badge a tab running claude/agy/opencode with its brand icon.
+    startAgentDetection();
     invoke<Record<string, string>>("app_info")
       .then((info) => setIsDevChannel((info?.channel ?? "dev") !== "release"))
       .catch(() => setIsDevChannel(true));
-    return off;
+    return () => {
+      off();
+      stopAgentDetection();
+    };
   }, []);
 
   // Dev-only: Ctrl+Shift+U opens the update modal as a looping DEMO (fake
@@ -1258,6 +1325,43 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey, true);
   }, [isDevChannel]);
 
+  // Retitle a tab based on the CLI agents detected across its terminal leaves.
+  // One agent → "Claude Code · {topic}" (parsed from its OSC title). Two+ →
+  // "Claude Code · OpenCode" (brand names joined, topics get noisy when
+  // stacked). No agent → falls back to the active pane's pretty shell title so
+  // a bare terminal keeps its shell name. Pinned titles are never touched.
+  const retitleTabByAgents = useCallback((tab: Tab) => {
+    if (tab.titlePinned) return;
+    const termLeaves = leaves(tab.root).filter((l) => l.kind === "term");
+    // Resolve the working folder name for this tab — Pi's title shows it
+    // ("Pi - ash-wails") since Pi's own OSC title is just the cwd path. The
+    // workspace folder is the cleanest identity; fall back to the pane's cwd.
+    const ws = tab.workspaceId
+      ? workspacesRef.current.list.find((w) => w.id === tab.workspaceId)
+      : undefined;
+    const folderName = ws?.name ?? (ws?.path ? basename(ws.path) : undefined);
+    const entries = termLeaves
+      .map((l) => {
+        const ag = getAgentForTerm(l.id);
+        if (!ag) return null;
+        const raw = getSession(l.id)?.lastTitle ?? "";
+        return { id: ag.id, rawTitle: raw };
+      })
+      .filter((x): x is { id: string; rawTitle: string } => x !== null);
+    if (entries.length > 0) {
+      const label = agentCombinedTitle(entries, () => folderName);
+      if (label) setTitle(tab.id, label);
+      return;
+    }
+    // No detected agent: use the active pane's last OSC title if it had one,
+    // otherwise leave the existing title (a pristine shell keeps its shell name).
+    const raw = getSession(tab.activePane)?.lastTitle ?? "";
+    if (raw) {
+      const label = prettyTitle(raw);
+      if (label) setTitle(tab.id, label);
+    }
+  }, [setTitle]);
+
   // Session events (shell ready, OSC title, PTY exit, link clicks) → state.
   useEffect(() => {
     configureSessions({
@@ -1268,14 +1372,19 @@ export default function App() {
         if (tab && !tab.titlePinned) setTitle(tab.id, shell);
       },
       onTitle: (paneId, title) => {
+        // An OSC title change is a strong early hint a CLI agent just became
+        // foreground — re-check its process before the next poll interval.
+        triggerDetect(paneId);
         const tab = tabsRef.current.find((t) =>
           leafIds(t.root).includes(paneId),
         );
-        const pretty = prettyTitle(title);
-        if (tab && !tab.titlePinned && tab.activePane === paneId && pretty)
-          setTitle(tab.id, pretty);
+        if (!tab || tab.titlePinned || tab.activePane !== paneId) return;
+        retitleTabByAgents(tab);
       },
-      onExit: (paneId) => closePane(paneId, false),
+      onExit: (paneId) => {
+        clearAgent(paneId);
+        closePane(paneId, false);
+      },
       onOpenLocalUrl: (paneId, url) => {
         const tab = tabsRef.current.find((t) =>
           leafIds(t.root).includes(paneId),
@@ -1285,6 +1394,19 @@ export default function App() {
       getCwd: () => activeWorkspaceRef.current?.path ?? null,
     });
   }, [closePane, setTitle, openWebPane]);
+
+  // When agent detection resolves (a CLI agent appears or disappears in a
+  // terminal), retitle the owning tab to the clean brand title — the process
+  // walk often fires before/after an OSC title, so this catches the moment the
+  // match lands even when the title hasn't changed.
+  useEffect(() => {
+    return onAgentDetectChange(() => {
+      for (const tab of tabsRef.current) {
+        if (tab.titlePinned) continue;
+        retitleTabByAgents(tab);
+      }
+    });
+  }, [setTitle]);
 
   // Links anywhere in the UI (chat markdown, etc.): localhost opens the
   // in-app browser pane next to the pane it was clicked in; everything else
@@ -1488,6 +1610,7 @@ export default function App() {
           onRemoveWorkspace={removeWorkspace}
           onNewTabInWorkspace={addTabInWorkspace}
           onMoveTabToWorkspace={moveTabToWorkspace}
+          onSplitMergeTab={splitMergeTab}
           onOpenBackgroundTerm={openBackgroundTerm}
           onOpenBgAgent={openBgAgentViewer}
           onKillBackgroundTerm={killBackgroundTerm}

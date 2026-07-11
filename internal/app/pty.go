@@ -111,6 +111,20 @@ func (p *Pty) PtyKill(id string) error {
 	return proc.Close()
 }
 
+// PtyForegroundProcess returns the deepest tty-attached descendant of the
+// ConPTY's root shell — the program actually driving the terminal right now
+// (claude.exe / agy.exe / opencode.exe, or the shell itself at a bare prompt).
+// The frontend polls this to badge a terminal with the CLI agent running in it.
+func (p *Pty) PtyForegroundProcess(id string) (ForegroundProcess, error) {
+	p.mu.Lock()
+	proc, ok := p.procs[id]
+	p.mu.Unlock()
+	if !ok {
+		return ForegroundProcess{}, fmt.Errorf("no pty %s", id)
+	}
+	return foregroundProcess(proc.pid())
+}
+
 // shutdown tears down every live PTY when the app quits.
 func (p *Pty) shutdown(_ context.Context) {
 	p.mu.Lock()

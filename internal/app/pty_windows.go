@@ -22,6 +22,16 @@ type ptyProc struct {
 func (p *ptyProc) Read(buf []byte) (int, error)  { return p.proc.Read(buf) }
 func (p *ptyProc) Write(b []byte) (int, error) { return p.proc.Write(b) }
 
+// pid returns the root shell's OS process id — the anchor for walking the
+// process tree to find the foreground agent (claude.exe / agy.exe / …)
+// currently driving this ConPTY.
+func (p *ptyProc) pid() int {
+	if p.proc != nil {
+		return p.proc.Pid()
+	}
+	return 0
+}
+
 // resolveWorkDir mirrors Ash's pty_spawn: a real directory wins, otherwise
 // fall back to the user's home. Never inherit the app's launch dir (e.g.
 // C:\Program Files\Ash) — New Terminal should open in ~, not the install folder.

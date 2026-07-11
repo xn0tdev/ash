@@ -39,6 +39,9 @@ export interface TermSession {
   container: HTMLDivElement | null;
   /** false for a headless background session that has never been opened. */
   rendered: boolean;
+  /** Last OSC window title seen from this terminal — used by agent detection
+   *  to extract a conversation topic (Claude Code emits {spinner} {topic}). */
+  lastTitle: string;
 }
 
 interface SessionEvents {
@@ -378,7 +381,10 @@ function attachRenderer(session: TermSession, host: HTMLElement, useWebgl = true
     clearTimeout(resizeTimer);
     resizeTimer = window.setTimeout(() => ptyResize(id, cols, rows), 80);
   });
-  term.onTitleChange((title) => events?.onTitle(id, title));
+  term.onTitleChange((title) => {
+    session.lastTitle = title;
+    events?.onTitle(id, title);
+  });
 
   session.container = container;
   session.fit = fit;
@@ -409,6 +415,7 @@ export function ensureSession(id: string, host: HTMLElement): TermSession {
     webgl: null,
     container: null,
     rendered: false,
+    lastTitle: "",
   };
   attachRenderer(session, host);
   // Spawn at the fitted size so the shell starts with the right geometry.
@@ -438,6 +445,7 @@ export function ensureBackgroundSession(id: string): TermSession {
     webgl: null,
     container: null,
     rendered: false,
+    lastTitle: "",
   };
   const host = document.createElement("div");
   host.style.cssText = "position:fixed;left:-10000px;top:0;width:900px;height:500px;overflow:hidden;";
@@ -453,6 +461,12 @@ export function ensureBackgroundSession(id: string): TermSession {
 export function scrollSessionToBottom(id: string) {
   const s = sessions.get(id);
   if (s?.rendered) s.term.scrollToBottom();
+}
+
+/** All live session ids (rendered or headless). Used by the agent-detection
+ *  poller to know which terminals to ask the backend about. */
+export function sessionIds(): string[] {
+  return [...sessions.keys()];
 }
 
 export function disposeSession(id: string) {

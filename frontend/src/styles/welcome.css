@@ -206,6 +206,26 @@
   opacity: 0.55;
 }
 
+/* Drag-a-tab-onto-a-pane split preview: a colored slab covers the half of the
+   pane where the new terminal will open, so the user sees the split before
+   they release. The class is toggled by the Sidebar drag handler. */
+.pane.split-drop-left::before,
+.pane.split-drop-right::before,
+.pane.split-drop-top::before,
+.pane.split-drop-bottom::before {
+  content: "";
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--accent, #6ea8fe) 28%, transparent);
+  border-radius: 10px;
+  corner-shape: squircle;
+}
+.pane.split-drop-left::before { top: 6px; bottom: 6px; left: 6px; right: 50%; }
+.pane.split-drop-right::before { top: 6px; bottom: 6px; left: 50%; right: 6px; }
+.pane.split-drop-top::before { left: 6px; right: 6px; top: 6px; bottom: 50%; }
+.pane.split-drop-bottom::before { left: 6px; right: 6px; top: 50%; bottom: 6px; }
+
 .term-host,
 .term-container {
   width: 100%;

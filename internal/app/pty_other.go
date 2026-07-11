@@ -23,6 +23,15 @@ type ptyProc struct {
 func (p *ptyProc) Read(buf []byte) (int, error)  { return p.out.Read(buf) }
 func (p *ptyProc) Write(b []byte) (int, error) { return p.in.Write(b) }
 
+// pid returns the root shell's OS process id. Used on non-Windows only for
+// shape parity — foreground-agent detection is Windows-only for now.
+func (p *ptyProc) pid() int {
+	if p.proc != nil && p.proc.Process != nil {
+		return p.proc.Process.Pid
+	}
+	return 0
+}
+
 func openConPTY(cwd string, cols, rows uint16, program string, args []string) (*ptyProc, error) {
 	shell := "bash"
 	if program != "" {

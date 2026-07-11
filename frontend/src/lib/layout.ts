@@ -71,6 +71,36 @@ export function splitLeaf(
   };
 }
 
+/** Insert `subtree` as a sibling of the leaf with `targetId`, wrapping that
+ *  leaf in a fresh split. `placeBefore` puts the new subtree as the `a` child
+ *  (left/top); false puts it as `b` (right/bottom). Used by drag-a-tab-onto-a-
+ *  pane to merge two tabs into one split — the dragged tab's whole subtree
+ *  moves in, so nothing orphans. */
+export function insertSibling(
+  node: PaneNode,
+  targetId: string,
+  dir: SplitDir,
+  subtree: PaneNode,
+  placeBefore: boolean,
+): PaneNode {
+  if (node.type === "leaf") {
+    if (node.id !== targetId) return node;
+    return {
+      type: "split",
+      id: crypto.randomUUID(),
+      dir,
+      ratio: 0.5,
+      a: placeBefore ? subtree : node,
+      b: placeBefore ? node : subtree,
+    };
+  }
+  return {
+    ...node,
+    a: insertSibling(node.a, targetId, dir, subtree, placeBefore),
+    b: insertSibling(node.b, targetId, dir, subtree, placeBefore),
+  };
+}
+
 /** Remove a leaf; a split with one child collapses into that child. */
 export function removeLeaf(node: PaneNode, targetId: string): PaneNode | null {
   if (node.type === "leaf") return node.id === targetId ? null : node;
