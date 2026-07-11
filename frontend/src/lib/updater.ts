@@ -180,11 +180,29 @@ export function stopDemo(): void {
   set({ stage: "idle", release: null, percent: 0, downloaded: 0, total: 0, error: null });
 }
 
-/** Auto-check on startup, quietly — the titlebar badge only shows if an
- *  update is actually available. Network failures are swallowed. */
+/** Auto-check on startup, then on a slow interval — the titlebar badge only
+ *  shows if an update is actually available. Network failures are swallowed
+ *  so an offline/airplane session never surfaces a broken update state. */
+const AUTO_CHECK_INTERVAL_MS = 45 * 60 * 1000; // every ~45 min after the first
+let autoCheckTimer: ReturnType<typeof setInterval> | null = null;
+
 export function startAutoCheck(): void {
-  // Delay so it doesn't compete with startup IO (PTY spawn, settings load).
+  // Delay the first check so it doesn't compete with startup IO (PTY spawn,
+  // settings load). Then keep re-checking so a user who leaves Ash open for
+  // hours still sees a new release badge without restarting.
   setTimeout(() => {
     checkForUpdate().catch(() => {});
   }, 4000);
+  if (autoCheckTimer) clearInterval(autoCheckTimer);
+  autoCheckTimer = setInterval(() => {
+    checkForUpdate().catch(() => {});
+  }, AUTO_CHECK_INTERVAL_MS);
+}
+
+/** Stop the periodic auto-check (used on teardown / demo handoff). */
+export function stopAutoCheck(): void {
+  if (autoCheckTimer) {
+    clearInterval(autoCheckTimer);
+    autoCheckTimer = null;
+  }
 }

@@ -217,6 +217,7 @@ import {
   EngineProvider,
 } from "../lib/settings";
 import type { ThinkingFormat } from "../lib/agent-engine/thinking-config";
+import { invoke } from "@tauri-apps/api/core";
 import { resetAshData } from "../lib/chat-store";
 import { loadModelsDev, lookupModel, providerLogo, modelLogo } from "../lib/models-dev";
 import type { ModelInfo } from "../lib/models-dev";
@@ -356,6 +357,14 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
   const [highlightKey, setHighlightKey] = useState<string | null>(null);
   const [resetOpen, setResetOpen] = useState(false);
   const [resetting, setResetting] = useState(false);
+  // Build version comes from the Go AppInfo binding (ldflags -X Version=…),
+  // not a hardcoded string — so About reflects the real shipped release.
+  const [appVersion, setAppVersion] = useState("");
+  useEffect(() => {
+    invoke<Record<string, string>>("app_info")
+      .then((info) => setAppVersion(info?.version ?? ""))
+      .catch(() => setAppVersion(""));
+  }, []);
   const [modelEdit, setModelEdit] = useState<EngineModel | null>(null);
   // models.dev auto-detect: the match for the edited model id, and whether the
   // catalog has loaded (so the model list can resolve logos). initialModelId
@@ -1165,7 +1174,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
               <section>
                 <h3>About</h3>
                 <div className="settings-empty">
-                  Ash 0.2.4 — minimal agentic terminal.
+                  Ash {appVersion || "dev"} — minimal agentic terminal.
                 </div>
 
                 <div className={`setting-row stack${highlightKey === "reset" ? " setting-highlight" : ""}`} data-setting-key="reset">
