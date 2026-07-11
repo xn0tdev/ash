@@ -32,6 +32,24 @@ export namespace app {
 	        this.status = source["status"];
 	    }
 	}
+	export class ProcessOutput {
+	    code?: number;
+	    stdout: string;
+	    stderr: string;
+	    timed_out: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ProcessOutput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.code = source["code"];
+	        this.stdout = source["stdout"];
+	        this.stderr = source["stderr"];
+	        this.timed_out = source["timed_out"];
+	    }
+	}
 	export class SandboxInfo {
 	    path: string;
 	    files: number;

@@ -120,47 +120,30 @@
 .slash-menu::-webkit-scrollbar {
   display: none;
 }
-/* The dark back rect ("backplate") lives permanently BEHIND the composer for
-   the built-in agent: same width/rounding/outline, one step darker, always
-   sticking out at the BOTTOM as a shelf holding the permission-mode toggle.
-   On a pending permission request it grows UPWARD too (top transitions),
-   revealing the summary + Allow/Deny fringe. */
-.agent-backplate {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  bottom: -36px;
-  z-index: -2;
-  display: flex;
-  flex-direction: column;
-  border-radius: 48px 48px 42px 42px;
-  corner-shape: squircle;
-  /* resting: NO chin — the footer buttons just float on the pane. The dark
-     panel only appears when a permission request grows the plate up (.raised). */
-  background: transparent;
-  transition: top 0.22s cubic-bezier(0.33, 1, 0.68, 1);
-}
-.agent-backplate.raised {
-  top: -46px;
-  background: color-mix(in srgb, var(--surface) 50%, var(--bg));
-}
+/* Permission decisions sit above the composer, not inside it — the composer
+   keeps its size and corners. No extra dark rect, just a compact row. */
 .agent-permcap {
+  position: absolute;
+  right: 8px;
+  bottom: calc(100% + 8px);
+  left: 8px;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 9px 12px 0 20px;
+  padding: 8px 14px;
   font-size: 13px;
+  pointer-events: auto;
   animation: sp-fade 0.18s ease;
 }
+/* Dark shelf that appears only under the composer when a permission request
+   is active. It connects the light composer to the footer row without growing
+   the main rect itself. */
 .agent-permcap.closing {
   animation: sp-fade 0.18s ease reverse forwards;
   pointer-events: none;
 }
-/* bottom shelf row: sits OVER the backplate's protruding strip (it can't
-   live inside the backplate — that's at z -2, a dropdown from there would
-   paint underneath the composer) */
+/* bottom shelf row: sits just under the composer */
 .agent-permfoot {
   position: absolute;
   left: 0;
@@ -587,23 +570,12 @@
   width: min(720px, 100% - 28px);
   margin: 0 auto 14px;
 }
-/* room for the permission fringe poking out above (after the width rules
-   so their margin shorthand doesn't reset it) */
-.agent-hero .agent-composer.has-permission,
-.agent-pane > .agent-composer.has-permission {
-  margin-top: 52px;
-}
 /* room for the always-on bottom shelf (built-in agent only) */
 .agent-hero .agent-composer.has-footbar {
   margin-bottom: 34px;
 }
 .agent-pane > .agent-composer.has-footbar {
   margin-bottom: 38px;
-}
-/* while the fringe is up, the drop shadow belongs to the DARK back rect,
-   not the light composer sitting on it */
-.agent-composer.has-permission > .squircle-bg {
-  filter: none;
 }
 /* dragging files over the input → an inset outline around the whole
    composer rect, with a gap between it and the edge */

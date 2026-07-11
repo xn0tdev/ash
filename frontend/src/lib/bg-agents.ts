@@ -1,5 +1,6 @@
 import { EngineSession } from "./agent-engine/session";
 import { AgentRole, DEFAULT_ROLE } from "./agent-engine/roles";
+import type { SafetyContext } from "./agent-engine/types";
 import type { DotMatrixVariant } from "../components/DotMatrix";
 
 // Background Ash agents: autonomous child engine sessions the main agent can
@@ -47,6 +48,8 @@ export interface BgAgent {
   managed?: boolean;
   /** Pane id of the chat that spawned it. */
   ownerId?: string;
+  /** Inherited from a Safe mode owner; background agents cannot auto-approve it. */
+  safety?: SafetyContext;
   /** "waiting" = reserved by a workflow but not yet started (its stage hasn't
    * begun) — shown up front so the whole team is visible from the outset. */
   status: "waiting" | "working" | "done" | "failed" | "stopped";
@@ -221,6 +224,7 @@ function newBgRecord(
   ownerId: string | undefined,
   role: AgentRole,
   managed: boolean,
+  safety?: SafetyContext,
 ): BgAgent {
   const used = new Set(agents.map((a) => a.name));
   const slot = NAMES.findIndex((n) => !used.has(n));
@@ -237,6 +241,7 @@ function newBgRecord(
     role,
     managed,
     ownerId,
+    safety: safety ? { ...safety, interactive: false } : undefined,
     status: "waiting",
     items: [{ k: "user", id: `${id}:0`, text: task }],
     result: "",
@@ -280,10 +285,10 @@ export function activateBgAgent(a: BgAgent, task: string): Promise<BgAgent> {
         b.sealThought();
         b.upsertTool(toolId, title, status, kind);
       },
-      // Children run autonomously — the role's permission mode is set via the
-      // constructor; this just belt-and-braces approves anything a "confirm"
-      // role would ask.
-      onPermissionRequest: (req) => a.session?.resolvePermission(req.id, true),
+      // A Safe mode background agent cannot silently grant a risky operation.
+      // It reports the block to its owner, whose interactive session can ask
+      // the user; non-safe role permissions retain the existing autonomous flow.
+      onPermissionRequest: (req) => a.session?.resolvePermission(req.id, !a.safety),
       onCompacting: (status) => {
         if (status === "start") b.upsertTool(`compact:${a.id}`, "Compressing context…", "in_progress", "compact");
         else b.upsertTool(`compact:${a.id}`, "Context compressed", "completed", "compact");
@@ -292,6 +297,7 @@ export function activateBgAgent(a: BgAgent, task: string): Promise<BgAgent> {
     },
     a.id,
     { allowedTools: a.role.tools, permissionMode: a.role.permissionMode, promptAddon: a.role.promptAddon },
+    a.safety,
   );
   a.session = session;
   a.status = "working";
@@ -333,6 +339,7 @@ export function startBgAgent(
   ownerId?: string,
   role: AgentRole = DEFAULT_ROLE,
   managed = false,
+  safety?: SafetyContext,
 ): BgAgent {
   // Concurrency is capped PER ROLE (its category pool), so several roles can run
   // full pools side by side — e.g. 10 reviewers and 10 editors at once.
@@ -343,7 +350,7 @@ export function startBgAgent(
     throw new Error(
       `Already running ${role.poolSize} ${role.label} agents — wait for one to finish or stop one.`,
     );
-  const a = newBgRecord(task, cwd, ownerId, role, managed);
+  const a = newBgRecord(task, cwd, ownerId, role, managed, safety);
   activateBgAgent(a, task); // fire-and-forget: result reaches the owner via the wake
   return a;
 }
@@ -356,8 +363,9 @@ export function reserveBgAgent(
   cwd: string,
   ownerId: string | undefined,
   role: AgentRole,
+  safety?: SafetyContext,
 ): BgAgent {
-  return newBgRecord(hint, cwd, ownerId, role, true);
+  return newBgRecord(hint, cwd, ownerId, role, true, safety);
 }
 
 /** Sidebar close button: stop a working agent, remove a finished one. */

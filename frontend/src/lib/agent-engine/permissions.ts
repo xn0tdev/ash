@@ -59,12 +59,22 @@ export class PermissionGate {
     this.mode = mode;
   }
 
-  check(toolName: string, input: unknown): Promise<boolean> {
-    if (this.mode === "full-auto" || !isRisky(toolName)) return Promise.resolve(true);
+  check(
+    toolName: string,
+    input: unknown,
+    options?: { forcePrompt?: boolean; summary?: string },
+  ): Promise<boolean> {
+    if (!options?.forcePrompt && (this.mode === "full-auto" || !isRisky(toolName)))
+      return Promise.resolve(true);
     const id = crypto.randomUUID();
     return new Promise<boolean>((resolve) => {
       this.waiters.set(id, resolve);
-      this.onRequest({ id, toolName, input, summary: summarize(toolName, input) });
+      this.onRequest({
+        id,
+        toolName,
+        input,
+        summary: options?.summary ?? summarize(toolName, input),
+      });
     });
   }
 

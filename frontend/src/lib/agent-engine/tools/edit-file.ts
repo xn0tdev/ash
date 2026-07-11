@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { Tool } from "../types";
-import { resolveInCwd } from "./paths";
+import { resolveToolPath } from "./paths";
 
 function countOccurrences(haystack: string, needle: string): number {
   if (!needle) return 0;
@@ -33,7 +33,7 @@ export const editFileTool: Tool = {
     required: ["path", "old_string", "new_string"],
   },
   async run(args, ctx) {
-    const path = resolveInCwd(ctx.cwd, args.path);
+    const path = resolveToolPath(ctx.cwd, args.path, ctx.safety);
     const oldString: string = args.old_string;
     const newString: string = args.new_string;
     const replaceAll: boolean = !!args.replace_all;

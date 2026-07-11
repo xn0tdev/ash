@@ -4,6 +4,8 @@ import { resolveEngineConfig, ResolvedEngineConfig } from "./config";
 import { buildSystemPrompt } from "./system-prompt";
 import { runTurn } from "./loop";
 import { compact, contextUsage } from "./context";
+import { CommandGuard } from "./safety";
+import type { SafetyContext } from "./types";
 
 /** Role scoping for a session — restricts its tools, permission mode, and adds
  * role-specific system-prompt guidance. Omitted for the main chat (full access). */
@@ -45,6 +47,9 @@ export class EngineSession {
   /** Role tool whitelist — undefined means every tool. Read by the loop when
    * advertising tools to the model and when gating each tool call. */
   allowedTools?: string[];
+  /** Set only while this session is operating in a Safe mode sandbox. */
+  safety?: SafetyContext;
+  commandGuard: CommandGuard;
 
   private abort: AbortController;
   private systemReady: Promise<void>;
@@ -59,10 +64,16 @@ export class EngineSession {
     public ownerId?: string,
     /** Role scoping — omitted for the main chat, set for background roles. */
     role?: SessionRoleOptions,
+    safety?: SafetyContext,
   ) {
     this.config = resolveEngineConfig();
     this.reasoningEffort = this.config.reasoningEffort;
     this.allowedTools = role?.allowedTools;
+    this.safety = safety;
+    this.commandGuard = new CommandGuard(() => ({
+      provider: this.config.provider,
+      model: this.config.safetyModel,
+    }));
     this.permissions = new PermissionGate(
       role?.permissionMode ?? this.config.permissionMode,
       events.onPermissionRequest,

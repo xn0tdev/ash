@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { Tool } from "../types";
 import { runProcess } from "./run-process";
+import { resolveToolPath } from "./paths";
 
 const TIMEOUT_MS = 20_000;
 const MAX_MATCHES = 200;
@@ -38,7 +39,7 @@ export const grepTool: Tool = {
     if (!(await hasRg()))
       return { ok: false, output: "ripgrep (rg) is not installed / not on PATH — grep is unavailable." };
 
-    const searchPath = args.path || ctx.cwd;
+    const searchPath = args.path ? resolveToolPath(ctx.cwd, args.path, ctx.safety) : ctx.cwd;
     const rgArgs = ["--json", "--max-count", "50"];
     if (args.case_insensitive) rgArgs.push("-i");
     if (args.glob) rgArgs.push("-g", args.glob);

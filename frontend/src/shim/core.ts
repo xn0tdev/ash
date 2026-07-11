@@ -8,6 +8,7 @@ import * as Git from "../../wailsjs/go/app/Git";
 import * as Tools from "../../wailsjs/go/app/Tools";
 import * as Sandbox from "../../wailsjs/go/app/Sandbox";
 import * as Pty from "../../wailsjs/go/app/Pty";
+import * as Process from "../../wailsjs/go/app/Process";
 import * as Updater from "../../wailsjs/go/app/Updater";
 import * as AppBinding from "../../wailsjs/go/app/App";
 
@@ -32,11 +33,11 @@ export function invoke<T = unknown>(cmd: string, args?: Record<string, unknown>)
 
     // ── git ──────────────────────────────────────────────────
     case "git_branch":
-      return Git.Branch(args?.dir as string) as Promise<T>;
+      return Git.Branch(args?.path as string) as Promise<T>;
     case "git_status":
-      return Git.Status(args?.dir as string) as Promise<T>;
+      return Git.Status(args?.path as string) as Promise<T>;
     case "git_diff_stat":
-      return Git.DiffStat(args?.dir as string) as Promise<T>;
+      return Git.DiffStat(args?.path as string) as Promise<T>;
 
     // ── tools ────────────────────────────────────────────────
     case "detect_bins":
@@ -68,6 +69,15 @@ export function invoke<T = unknown>(cmd: string, args?: Record<string, unknown>)
       return Pty.PtyResize(args?.id as string, args?.cols as number, args?.rows as number) as Promise<T>;
     case "pty_kill":
       return Pty.PtyKill(args?.id as string) as Promise<T>;
+
+    // ── one-shot processes ───────────────────────────────────
+    case "process_run":
+      return Process.Run(
+        args?.program as string,
+        (args?.args as string[] | undefined) ?? [],
+        (args?.cwd as string | undefined) ?? "",
+        (args?.timeoutMs as number | undefined) ?? 120_000,
+      ) as Promise<T>;
 
     // ── updater (self-update against GitHub Releases) ────────
     case "check_update":

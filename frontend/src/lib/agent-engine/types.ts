@@ -47,6 +47,13 @@ export interface ToolSchema {
   parameters: JsonSchema;
 }
 
+export interface SafetyContext {
+  /** Canonical sandbox root. Agent file tools must stay below this path. */
+  root: string;
+  /** Main chats can turn a risky operation into an explicit user approval. */
+  interactive: boolean;
+}
+
 export interface ToolContext {
   cwd: string;
   signal: AbortSignal;
@@ -55,6 +62,8 @@ export interface ToolContext {
   /** Safe mode: open the sandbox review/merge UI for the user. Present only on
    * the main chat session (undefined for background agents). */
   reviewMerge?: () => void;
+  /** Present only for Safe mode sessions and inherited by child agents. */
+  safety?: SafetyContext;
 }
 
 export interface ToolResult {

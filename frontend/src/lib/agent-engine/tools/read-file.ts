@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { Tool } from "../types";
-import { resolveInCwd } from "./paths";
+import { resolveToolPath } from "./paths";
 
 const MAX_LINES = 2000;
 // A single minified/base64 line, or a giant file, otherwise produces a huge
@@ -23,7 +23,7 @@ export const readFileTool: Tool = {
     required: ["path"],
   },
   async run(args, ctx) {
-    const path = resolveInCwd(ctx.cwd, args.path);
+    const path = resolveToolPath(ctx.cwd, args.path, ctx.safety);
     const content = await invoke<string | null>("read_text", { path });
     if (content === null) return { ok: false, output: `File not found: ${path}` };
 

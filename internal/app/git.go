@@ -20,6 +20,9 @@ func NewGit() *Git { return &Git{} }
 func gitRun(dir string, args ...string) (string, error) {
 	cmd := exec.Command("git", args...)
 	cmd.Dir = dir
+	// The branch/status UI polls git periodically. A GUI binary must hide these
+	// one-shot child processes or Windows briefly flashes a console every poll.
+	hideProcessWindow(cmd)
 	out, err := cmd.Output()
 	if err != nil {
 		// git exits non-zero outside a repo / with no commits — surface "" so

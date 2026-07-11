@@ -255,6 +255,58 @@ async function runTurnInner(session: EngineSession): Promise<void> {
       }
 
       events.onToolCall(tc.id, title, "in_progress", tc.name);
+      if (session.safety) {
+        const verdict = await session.commandGuard.review(
+          tc.name,
+          tc.args,
+          session.safety,
+          session.signal,
+        );
+        if (verdict.decision === "deny") {
+          events.onToolCall(tc.id, title, "failed", tc.name);
+          resultBlocks.push({
+            type: "tool_result",
+            toolUseId: tc.id,
+            content: `Safe mode blocked this action: ${verdict.reason}${verdict.alternative ? ` Safer alternative: ${verdict.alternative}` : ""}`,
+            isError: true,
+          });
+          continue;
+        }
+        if (verdict.decision === "ask") {
+          if (!session.safety.interactive) {
+            events.onToolCall(tc.id, title, "failed", tc.name);
+            resultBlocks.push({
+              type: "tool_result",
+              toolUseId: tc.id,
+              content: `Safe mode blocked this risky action from a background agent: ${verdict.reason} Report the need to your owning agent so it can ask the user.`,
+              isError: true,
+            });
+            continue;
+          }
+          const summary = [
+            verdict.summary ?? title,
+            `Safe mode review: ${verdict.reason}`,
+            verdict.alternative ? `Safer alternative: ${verdict.alternative}` : "",
+          ]
+            .filter(Boolean)
+            .join("\n");
+          const approved = await session.permissions.check(tc.name, tc.args, {
+            forcePrompt: true,
+            summary,
+          });
+          if (!approved) {
+            events.onToolCall(tc.id, title, "failed", tc.name);
+            resultBlocks.push({
+              type: "tool_result",
+              toolUseId: tc.id,
+              content: `User denied the Safe mode action. ${verdict.alternative ? `Try this safer alternative instead: ${verdict.alternative}` : "Ask the user for a safer approach."}`,
+              isError: true,
+            });
+            continue;
+          }
+        }
+      }
+
       const approved = await session.permissions.check(tc.name, tc.args);
       if (!approved) {
         events.onToolCall(tc.id, title, "failed", tc.name);
@@ -268,6 +320,7 @@ async function runTurnInner(session: EngineSession): Promise<void> {
           signal: session.signal,
           ownerId: session.ownerId,
           reviewMerge: session.events.onMergeReview,
+          safety: session.safety,
         });
         events.onToolCall(tc.id, title, result.ok ? "completed" : "failed", tc.name);
         resultBlocks.push({ type: "tool_result", toolUseId: tc.id, content: result.output, isError: !result.ok });

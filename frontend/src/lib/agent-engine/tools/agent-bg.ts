@@ -67,7 +67,7 @@ export const bgAgentTool: Tool = {
           })
         : resolveRole(roleId);
     try {
-      const a = startBgAgent(task, ctx.cwd, ctx.ownerId, role);
+      const a = startBgAgent(task, ctx.cwd, ctx.ownerId, role, false, ctx.safety);
       const active = getBgAgents().filter(
         (x) => x.status === "working" && x.role.id === role.id,
       ).length;

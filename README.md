@@ -15,7 +15,7 @@ Ash pairs a real terminal with a provider-agnostic agent engine (Go + React, via
 - **Self-updates by swapping the binary** — no installer, no setup wizard, no UAC prompt on the happy path. A blue Update button in the sidebar appears when a new release is out; click it and Ash restarts on the new version. Most updaters drag you through a wizard and an admin prompt.
 - **Terminal + agent in one window** — run a real shell and drive an AI agent side by side; the agent can run commands, edit files, grep, glob, fetch the web, and spawn background shells you can read back later. No separate chat app + terminal juggling.
 - **New terminals open in your home dir, not the install folder** — the default cwd falls back to `~`, not `C:\Program Files\Ash`. Most apps plop you in their own directory.
-- **Paste from anywhere, including dictation** — Ctrl+V / Ctrl+Shift+V read the clipboard reliably (with retry), and a synchronous paste event catches dictation apps like Wispr Flow so they auto-insert without you holding anything.
+- **Reliable terminal paste** — Ctrl+V / Ctrl+Shift+V and right-click paste use the clipboard directly; normal paste events from dictation apps such as Wispr Flow are handled without duplicate insertion.
 - **Workspaces that stick** — bind a folder to a workspace; chats and terminals live there. Drag a tab onto a workspace and its terminal re-points to that folder, history intact.
 - **Any OpenAI-compatible model** — drop in your endpoint and key; the agent works with whatever provider you point it at, no vendor lock-in.
 

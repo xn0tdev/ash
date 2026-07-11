@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { Tool } from "../types";
 import { runProcess } from "./run-process";
+import { resolveToolPath } from "./paths";
 
 const TIMEOUT_MS = 20_000;
 const MAX_FILES = 500;
@@ -27,7 +28,7 @@ export const globTool: Tool = {
     if (!(await hasRg()))
       return { ok: false, output: "ripgrep (rg) is not installed / not on PATH — glob is unavailable." };
 
-    const searchPath = args.path || ctx.cwd;
+    const searchPath = args.path ? resolveToolPath(ctx.cwd, args.path, ctx.safety) : ctx.cwd;
     const rgArgs = ["--files", "-g", args.pattern, searchPath];
 
     const res = await runProcess("rg", rgArgs, ctx.cwd, { timeoutMs: TIMEOUT_MS, signal: ctx.signal });

@@ -212,6 +212,16 @@
   height: 100%;
 }
 
+/* Clip the xterm canvas to its host. While a neighbor (sidebar/explorer) is
+   animating its width, the pane shrinks every frame but fit() is deliberately
+   deferred (~120ms trailing) so the heavy grid recompute doesn't run per-frame.
+   Until fit() catches up, the canvas keeps its old — larger — pixel size and
+   would otherwise paint over the explorer's background. overflow:hidden makes
+   the stale overflow invisible instead of a broken-looking bleed. */
+.term-host {
+  overflow: hidden;
+}
+
 .term-container .xterm {
   height: 100%;
 }

@@ -4,7 +4,6 @@ import { WebglAddon } from "@xterm/addon-webgl";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
-import { listen } from "@tauri-apps/api/event";
 import "@xterm/xterm/css/xterm.css";
 
 import {
@@ -60,50 +59,8 @@ let events: SessionEvents | null = null;
 // (drag-to-workspace respawns it in the folder); a used one must be kept.
 const used = new Set<string>();
 
-// ── Clipboard watcher (Wispr Flow / dictation auto-paste) ───────────────
-// External dictation apps (Wispr Flow) set the OS clipboard and try to paste,
-// but their paste often never reaches the Wails webview's DOM (xterm's hidden
-// textarea doesn't get the event the way a real <textarea> does in the chat).
-// So the Go side polls the OS clipboard and emits "clipboard:changed"; here
-// we paste the new text into whichever terminal pane is focused — bypassing
-// the browser entirely. `lastWrittenClipboard` skips changes WE caused (a
-// copy from the terminal selection) so we don't paste our own copy back in.
-let focusedTermId: string | null = null;
-let lastWrittenClipboard = "";
-let clipboardWatcherInit = false;
-
-/** Set by TerminalPane when it gains/loses focus so the watcher knows where to
- *  route an auto-paste. null when no terminal is focused (chat, explorer, …). */
-export function setFocusedTerminal(id: string | null) {
-  focusedTermId = id;
-}
-
-/** Copy text to the clipboard AND remember it so the watcher skips the change
- *  it just caused (otherwise copying a selection would immediately re-paste
- *  it into the same terminal). */
 function copyToClipboard(text: string): void {
-  lastWrittenClipboard = text;
   writeText(text).catch(() => {});
-}
-
-function initClipboardWatcher(): void {
-  if (clipboardWatcherInit) return;
-  clipboardWatcherInit = true;
-  listen<{ text: string }>("clipboard:changed", (e) => {
-    const text = e.payload?.text ?? "";
-    if (!text || !focusedTermId) return;
-    // Only auto-paste when the Ash window is actually focused (document.hasFocus).
-    // Without this, copying text to paste into Discord/Telegram — which changes
-    // the clipboard while Ash is in the background but a terminal is still the
-    // active pane — would inject that text into Ash. Wispr Flow dictation runs
-    // while Ash is focused, so this gate keeps it working.
-    if (!document.hasFocus()) return;
-    if (text === lastWrittenClipboard) return; // our own copy — skip
-    const id = focusedTermId;
-    if (!sessions.has(id)) return; // session may have been disposed
-    used.add(id);
-    ptyWrite(id, text);
-  }).catch(() => {});
 }
 
 /** Read the clipboard, retrying briefly so a dictation app (Wispr Flow) that
@@ -167,7 +124,6 @@ export function setSpawnOptions(id: string, opts: SpawnOptions) {
 
 export function configureSessions(e: SessionEvents) {
   events = e;
-  initClipboardWatcher();
 }
 
 export function getSession(id: string): TermSession | undefined {

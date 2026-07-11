@@ -13,8 +13,8 @@ import (
 // Build-time vars (set via -ldflags "-X ash-wails/internal/app.Version=...").
 // Defaults let a plain `go build` / `wails build` run without flags.
 var (
-	Version      = "dev"
-	Commit       = "none"
+	Version = "dev"
+	Commit  = "none"
 	// BuildChannel labels the build: "dev" for local/manual builds (the
 	// binary you run from build/bin), "release" for the tagged GitHub build
 	// that ships to users via the installer. Used to gate dev-only toys
@@ -29,25 +29,25 @@ var (
 // (frontend/wailsjs/go/...), OR through the Tauri-compat shim
 // (src/shim/core.ts) which routes invoke("read_text", …) → Fs.ReadText(…).
 type App struct {
-	ctx      context.Context
-	pty      *Pty
-	fs       *Fs
-	git      *Git
-	tools    *Tools
-	sandbox  *Sandbox
-	updater  *Updater
-	clipboard *ClipboardWatcher
+	ctx     context.Context
+	pty     *Pty
+	fs      *Fs
+	git     *Git
+	tools   *Tools
+	process *Process
+	sandbox *Sandbox
+	updater *Updater
 }
 
 func NewApp() *App {
 	return &App{
-		pty:       NewPty(),
-		fs:        NewFs(),
-		git:       NewGit(),
-		tools:     NewTools(),
-		sandbox:   NewSandbox(),
-		updater:   NewUpdater(),
-		clipboard: NewClipboardWatcher(),
+		pty:     NewPty(),
+		fs:      NewFs(),
+		git:     NewGit(),
+		tools:   NewTools(),
+		process: NewProcess(),
+		sandbox: NewSandbox(),
+		updater: NewUpdater(),
 	}
 }
 
@@ -55,7 +55,6 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	a.pty.startup(ctx)
 	a.updater.startup(ctx)
-	a.clipboard.startup(ctx)
 	storeToolsCtx(ctx)
 }
 
@@ -72,7 +71,6 @@ func (a *App) AppInfo() map[string]string {
 
 func (a *App) shutdown(ctx context.Context) {
 	a.pty.shutdown(ctx)
-	a.clipboard.shutdown(ctx)
 }
 
 // Run builds the Wails app options and starts the event loop. assets is the
@@ -113,7 +111,8 @@ func Run(assets embed.FS) error {
 			a.fs,      // ReadText / WriteText / DeletePath / ListDir / HomeDir
 			a.git,     // Branch / Status / DiffStat
 			a.tools,   // DetectBins / ResolveBash / FindEditors / SshHosts / OpenIn
-			a.sandbox, // Copy / Changes / Merge / Remove (stubbed for now)
+			a.process, // Run one-shot commands for agent tools
+			a.sandbox, // Copy / Changes / Merge / Remove
 			a.updater, // CheckUpdate / DownloadUpdate / ApplyUpdate / Restart
 		},
 		Windows: &windows.Options{

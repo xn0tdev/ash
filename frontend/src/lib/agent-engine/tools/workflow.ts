@@ -74,7 +74,7 @@ export const runWorkflowTool: Tool = {
 
     const reserve = (n: number, role: (typeof ROLES)[string], hint: (i: number) => string) =>
       Array.from({ length: n }, (_, i) => {
-        const a = reserveBgAgent(hint(i), ctx.cwd, ctx.ownerId, role);
+        const a = reserveBgAgent(hint(i), ctx.cwd, ctx.ownerId, role, ctx.safety);
         all.push(a);
         return a;
       });
@@ -173,7 +173,7 @@ export const spawnAgentsTool: Tool = {
     let poolMsg = "";
     for (const task of tasks) {
       try {
-        started.push(startBgAgent(task, ctx.cwd, ctx.ownerId, role).name);
+        started.push(startBgAgent(task, ctx.cwd, ctx.ownerId, role, false, ctx.safety).name);
       } catch (e) {
         poolMsg = ` Could not start the rest: ${e instanceof Error ? e.message : String(e)}`;
         break;

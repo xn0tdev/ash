@@ -790,12 +790,14 @@ export default function AgentThread({
       // system prompt points at the sandbox; the background agents this chat
       // spawns inherit this cwd, so they're sandboxed too. Off → the live dir.
       let workCwd = cwd;
-      if (safeMode && cwd) {
+      if (safeMode) {
+        if (!cwd) throw new Error("Safe mode needs an opened workspace folder.");
         try {
           workCwd = (await ensureSandbox(id, cwd)).path;
         } catch (e) {
-          push({ k: "error", id: nextId(), text: `Safe mode: couldn't create sandbox — ${e instanceof Error ? e.message : String(e)}` });
-          workCwd = cwd;
+          throw new Error(
+            `Safe mode couldn't create an isolated sandbox, so the agent was not started: ${e instanceof Error ? e.message : String(e)}`,
+          );
         }
       }
       if (!engineSession.current) {
@@ -834,7 +836,7 @@ export default function AgentThread({
             flushStream();
             push({ k: "error", id: nextId(), text: msg });
           },
-        }, id);
+        }, id, undefined, safeMode ? { root: workCwd, interactive: true } : undefined);
         // Restored chat: hand the engine its previous conversation so
         // follow-ups keep full context across app restarts.
         if (savedHistory.current?.length) {
@@ -846,12 +848,15 @@ export default function AgentThread({
       }
       // A reused session follows the toggle (fresh ones were built with it).
       engineSession.current.cwd = workCwd;
+      engineSession.current.safety = safeMode
+        ? { root: workCwd, interactive: true }
+        : undefined;
       // First turn inside the sandbox: tell the agent it's in safe mode and how
       // to hand the work back (it proposes the merge itself — there's no button).
       if (workCwd !== cwd && !safeAnnounced.current) {
         safeAnnounced.current = true;
         engineSession.current.queueNote(
-          "You are working in SAFE MODE: this is a sandbox COPY of the project, so your edits do NOT touch the real project yet. Do the whole task first. Call the propose_merge tool ONLY at the very end — once the ENTIRE task is genuinely finished and (where it applies) verified. Never propose the merge early, mid-task, or after just a partial change; it must be your last action. It shows the user everything you changed so they can merge into the real project (or discard). Don't mention a merge button; you propose the merge yourself.",
+          "You are working in SAFE MODE: this is an isolated sandbox COPY of the project. Stay inside its working directory: never use absolute paths or ../ to reach outside it. Dependencies are not linked from the real project; if a command needs them, install them only in this sandbox. Risky commands are independently reviewed and may require the user's approval. Do the whole task first. Call the propose_merge tool ONLY at the very end — once the ENTIRE task is genuinely finished and (where it applies) verified. Never propose the merge early, mid-task, or after just a partial change; it must be your last action. It shows the user everything you changed so they can merge into the real project (or discard). Don't mention a merge button; you propose the merge yourself.",
         );
       }
       await engineSession.current.prompt(prompt, blocks);
@@ -984,6 +989,7 @@ export default function AgentThread({
       // rebuild the adapter so the very next turn hits the right endpoint.
       sess.config.provider = providerInstance(prov);
       sess.config.model = fast && m.fastId ? m.fastId : m.modelId;
+      sess.config.safetyModel = fast ? m.modelId : (m.fastId ?? m.modelId);
       sess.config.contextWindow = m.contextWindow;
       sess.config.supportsImages = m.supportsImages;
       sess.reportContext();
@@ -1387,31 +1393,25 @@ export default function AgentThread({
       </div>
     ) : (
     <SquircleBox
-      className={`agent-composer${pendingPermission && !permClosing ? " has-permission" : ""}${agent?.engine ? " has-footbar" : ""}${dragOver ? " drop-over" : ""}`}
+      className={`agent-composer${agent?.engine ? " has-footbar" : ""}${dragOver ? " drop-over" : ""}`}
       radius={44}
       smoothing={1}
     >
+      {pendingPermission && !permClosing && (
+        <div className={`agent-permcap${permClosing ? " closing" : ""}`}>
+          <span className="agent-permcap-text">{pendingPermission.summary}</span>
+          <span className="agent-permcap-actions">
+            <button className="allow" onClick={() => respondPermission(true)}>
+              Allow
+            </button>
+            <button className="deny" onClick={() => respondPermission(false)}>
+              Deny
+            </button>
+          </span>
+        </div>
+      )}
       {agent?.engine && (
         <>
-          <div
-            className={`agent-backplate${pendingPermission && !permClosing ? " raised" : ""}`}
-          >
-            {pendingPermission && (
-              <div className={`agent-permcap${permClosing ? " closing" : ""}`}>
-                <span className="agent-permcap-text">{pendingPermission.summary}</span>
-                <span className="agent-permcap-actions">
-                  <button className="allow" onClick={() => respondPermission(true)}>
-                    Allow
-                  </button>
-                  <button className="deny" onClick={() => respondPermission(false)}>
-                    Deny
-                  </button>
-                </span>
-              </div>
-            )}
-          </div>
-          {/* rendered OUTSIDE the backplate: it sits at z -2, so a dropdown
-              opened from inside it would paint underneath the composer */}
           <div className="agent-permfoot">
             <div className="mode-drop-wrap">
               <button
@@ -1893,10 +1893,11 @@ export default function AgentThread({
               <span className="safe-setup-title">Setting up safe mode</span>
             </div>
             <p>
-              Ash will work in a sandbox copy of your project — a filtered
-              duplicate under ~/.ash/sandboxes. Your real files stay untouched;
-              when the agent finishes it shows you what changed so you can review
-              and merge it in (or discard).
+              Ash will work in a sandbox copy of your project under
+              ~/.ash/sandboxes. File access outside that copy is blocked, and
+              risky commands require a separate safety review before they run.
+              When the agent finishes, review and merge only the changes you want
+              to keep — or discard the copy.
             </p>
             <div className="confirm-actions">
               <button className="primary" onClick={() => setSafeInfoOpen(false)}>

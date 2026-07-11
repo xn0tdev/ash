@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { Tool } from "../types";
-import { resolveInCwd } from "./paths";
+import { resolveToolPath } from "./paths";
 
 // edit_file can't create a file (no old_string to anchor to) — this is the
 // only tool that creates or wholesale-overwrites one.
@@ -17,7 +17,7 @@ export const writeFileTool: Tool = {
     required: ["path", "content"],
   },
   async run(args, ctx) {
-    const path = resolveInCwd(ctx.cwd, args.path);
+    const path = resolveToolPath(ctx.cwd, args.path, ctx.safety);
     await invoke("write_text", { path, contents: args.content ?? "" });
     return { ok: true, output: `Wrote ${path}` };
   },

@@ -6,6 +6,9 @@ import { Provider } from "./providers/provider";
 export interface ResolvedEngineConfig {
   provider: Provider;
   model: string;
+  /** Independent safety-review pass. Prefer the other fast/default variant so
+   * risky commands are assessed by a separate model request. */
+  safetyModel: string;
   /** Active model's context window in tokens (battery gauge + compaction). */
   contextWindow: number;
   /** Whether the active model accepts image inputs. */
@@ -39,6 +42,7 @@ export function resolveEngineConfig(): ResolvedEngineConfig {
   return {
     provider: providerInstance(prov),
     model: s.useFast && active.fastId ? active.fastId : active.modelId,
+    safetyModel: s.useFast ? active.modelId : (active.fastId ?? active.modelId),
     contextWindow: active.contextWindow,
     supportsImages: active.supportsImages,
     thinkingFormat: active.thinkingFormat,
