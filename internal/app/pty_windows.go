@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/UserExistsError/conpty"
 )
@@ -89,10 +90,30 @@ func isPipeClosed(err error) bool { return err == io.EOF }
 
 func findShell() []string {
 	// pwsh preferred, powershell fallback, cmd last resort — matches Ash's
-	// Windows-shell assumption (AGENTS.md).
+	// Windows-shell assumption (AGENTS.md). LookPath works once ensureSystemPath
+	// has patched PATH at startup; the absolute-path fallbacks guard against a
+	// still-broken PATH so we never end up with a bare "cmd.exe" that can't be
+	// spawned.
 	for _, name := range []string{"pwsh", "powershell", "cmd"} {
 		if path, err := exec.LookPath(name); err == nil {
 			return []string{path}
+		}
+	}
+	windir := os.Getenv("windir")
+	if windir == "" {
+		windir = os.Getenv("SystemRoot")
+	}
+	if windir == "" {
+		windir = `C:\Windows`
+	}
+	candidates := []string{
+		`C:\Program Files\PowerShell\7\pwsh.exe`,
+		filepath.Join(windir, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"),
+		filepath.Join(windir, "System32", "cmd.exe"),
+	}
+	for _, c := range candidates {
+		if _, err := os.Stat(c); err == nil {
+			return []string{c}
 		}
 	}
 	return []string{"cmd.exe"}

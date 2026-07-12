@@ -53,6 +53,10 @@ func NewApp() *App {
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	// GUI launchers can hand us a PATH missing C:\Windows\System32, which
+	// breaks every exec.LookPath / child spawn (powershell, git, rg…). Patch
+	// it once, before any subsystem touches the shell.
+	ensureSystemPath()
 	a.pty.startup(ctx)
 	a.updater.startup(ctx)
 	storeToolsCtx(ctx)
