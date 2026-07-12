@@ -1,3 +1,10 @@
+// TODO(future): per-agent brand icons. This module is currently NOT imported
+// anywhere — the tab-row brand avatars were dropped from the sidebar while the
+// CLI-agent detection logic (lib/agent-detect.ts) was kept. When a future
+// feature wants to badge a terminal that's running claude / antigravity /
+// opencode / pi again, re-add the import in Sidebar.tsx and these components
+// will light back up as-is.
+//
 // Brand logos for detected CLI agents, imported as URL strings (Vite serves
 // the raw .svg). Unlike the inline sidebar icons these keep their original
 // brand colors — recognition matters more than theme-matching for a logo.

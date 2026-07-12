@@ -51,6 +51,7 @@ export namespace app {
 	    stdout: string;
 	    stderr: string;
 	    timed_out: boolean;
+	    cancelled: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new ProcessOutput(source);
@@ -62,6 +63,7 @@ export namespace app {
 	        this.stdout = source["stdout"];
 	        this.stderr = source["stderr"];
 	        this.timed_out = source["timed_out"];
+	        this.cancelled = source["cancelled"];
 	    }
 	}
 	export class SandboxInfo {

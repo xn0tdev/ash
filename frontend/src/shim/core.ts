@@ -75,11 +75,14 @@ export function invoke<T = unknown>(cmd: string, args?: Record<string, unknown>)
     // ── one-shot processes ───────────────────────────────────
     case "process_run":
       return Process.Run(
+        args?.id as string,
         args?.program as string,
         (args?.args as string[] | undefined) ?? [],
         (args?.cwd as string | undefined) ?? "",
         (args?.timeoutMs as number | undefined) ?? 120_000,
       ) as Promise<T>;
+    case "process_cancel":
+      return Process.Cancel(args?.id as string) as Promise<T>;
 
     // ── updater (self-update against GitHub Releases) ────────
     case "check_update":

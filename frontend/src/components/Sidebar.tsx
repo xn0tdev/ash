@@ -68,7 +68,10 @@ import {
   AgentDoneChatIcon, BroomIcon, CloseSquareIcon, GearIcon, NewTabIcon,
   SearchIcon,
 } from "./sidebar/icons";
-import { AgentSingleIcon, AgentPairIcon } from "./sidebar/agent-icons";
+// TODO(future): per-agent brand icons (claude / antigravity / opencode / pi)
+// used to render here via ./sidebar/agent-icons. The brand artwork is dropped
+// for now, but the detection logic in lib/agent-detect.ts is kept so a later
+// feature can badge a terminal running a CLI agent without re-deriving it.
 
 // Pick the tab-row icon by what the tab holds. A chat pane is the star of a
 // tab — when one is present (even in a "chat left, terminal right" split) show
@@ -82,15 +85,9 @@ function tabIcon(tab: Tab) {
     if (statuses.includes("done")) return <AgentDoneIcon />;
     return <AgentTabIcon />;
   }
-  // Terminals with a detected CLI agent get that agent's brand logo instead of
-  // the generic terminal icon. Collect matches across every term leaf so a
-  // split holding two agents (claude | opencode) shows a paired avatar stack.
-  const termLeaves = ls.filter((l) => l.kind === "term");
-  const matched = termLeaves
-    .map((l) => getAgentForTerm(l.id)?.id)
-    .filter((id): id is string => !!id);
-  if (matched.length === 1) return <AgentSingleIcon id={matched[0]} />;
-  if (matched.length >= 2) return <AgentPairIcon ids={matched} />;
+  // A terminal running a detected CLI agent now falls through to the generic
+  // terminal icon below. getAgentForTerm() is still called by renderTab() and
+  // by App's tab-title logic, so detection stays live for the future feature.
   // No chat, no detected agent: a single-leaf tab shows its own kind.
   if (ls.length === 1) {
     if (ls[0].kind === "file") return <FileTabIcon />;

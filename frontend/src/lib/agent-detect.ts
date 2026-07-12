@@ -228,3 +228,46 @@ export function agentCombinedTitle(
     .filter(Boolean)
     .join(" · ");
 }
+
+// ── Agent working/done status ───────────────────────────────────────────
+// Each CLI surfaces its state in the OSC title (and Pi also via OSC 9;4
+// progress sequences, sniffed in term.ts). We parse the title into a status so
+// the sidebar can show a working spinner vs a done check on the agent's tab.
+//   Claude Code: braille spinner (U+2800–U+28FF) = working, asterisk
+//     marker (U+2733) = turn ended.
+//   OpenCode: spinner prefix (braille) = busy, `▣` = idle (built-in, PR #29597).
+//   Pi (with a status extension): `◰◳◲◱`/braille spinner = working,
+//     `✓` or `●` = idle. Pi's built-in OSC 9;4 path is handled separately.
+//   Antigravity: title is user-customizable — no reliable status pattern.
+export type AgentRunStatus = "working" | "done";
+
+const BRAILLE_SPINNER = /[\u2800-\u28ff]/;
+const PI_SPINNER = /[\u25f0-\u25f3 ◰◳◲◱]/;
+
+/** Parse an agent's run status from its raw OSC title. Returns null when no
+ *  status can be inferred (unknown agent, title disabled, or idle without a
+ *  distinct done-marker). Callers should treat null as "unchanged". */
+export function parseAgentStatus(agentId: string, rawTitle: string): AgentRunStatus | null {
+  const t = rawTitle ?? "";
+  if (!t) return null;
+  if (agentId === "claude") {
+    // Working while a braille spinner leads; done when the asterisk marker leads.
+    if (/^[\u2800-\u28ff]/.test(t)) return "working";
+    if (/^[\u2733-\u2735\u2727]/.test(t)) return "done";
+    return null;
+  }
+  if (agentId === "opencode") {
+    // Built-in status prefix: spinner (braille) = busy, ▣ = idle.
+    if (BRAILLE_SPINNER.test(t.slice(0, 3))) return "working";
+    if (/^[▣]/.test(t)) return "done";
+    return null;
+  }
+  if (agentId === "pi") {
+    // Pi with a status extension (pi-idle / pi-dynamic-title): spinner =
+    // working, ✓ or ● (with optional context-% prefix) = done.
+    if (PI_SPINNER.test(t) || BRAILLE_SPINNER.test(t.slice(0, 3))) return "working";
+    if (/^(\[\d+%\]!?\s*)?[✓●]/.test(t)) return "done";
+    return null;
+  }
+  return null;
+}

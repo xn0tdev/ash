@@ -6,16 +6,18 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"golang.org/x/sys/windows/registry"
 )
 
-// ensureSystemPath makes sure the process PATH includes the standard Windows
-// system directories. GUI launchers (autostart, shortcuts, Wails dev) often
-// hand the app a PATH that's missing C:\Windows\System32 — which breaks every
-// exec.LookPath("powershell") / ("git") / ("rg") and every child process that
-// shells out to system tools. We patch os.Environ once at startup so all later
-// exec.Cmd / conpty spawns inherit a sane PATH.
+// ensureSystemPath restores the effective Windows PATH when a GUI launcher
+// hands Ash a truncated one. Adding System32 alone can launch PowerShell, but
+// it still leaves the agent unable to find git, rg, node/npm, bun, and other
+// developer tools installed through the normal machine/user PATH entries.
 //
-// Idempotent: only appends directories that are genuinely missing.
+// Read both persistent registry sources, then append only missing entries to
+// the inherited PATH. This preserves an intentional caller-provided ordering
+// while recovering the same tool locations Explorer would normally provide.
 func ensureSystemPath() {
 	windir := os.Getenv("windir")
 	if windir == "" {
@@ -31,37 +33,63 @@ func ensureSystemPath() {
 		windir,
 		filepath.Join(windir, "System32", "Wbem"),
 	}
-
-	current := os.Getenv("PATH")
-	parts := strings.Split(current, ";")
-	lower := make([]string, 0, len(parts))
-	for _, p := range parts {
-		lower = append(lower, strings.ToLower(strings.TrimRight(p, `\/`)))
+	registryPaths := []string{
+		registryPath(registry.LOCAL_MACHINE, `SYSTEM\CurrentControlSet\Control\Session Manager\Environment`),
+		registryPath(registry.CURRENT_USER, `Environment`),
 	}
 
-	var missing []string
-	for _, r := range required {
-		if r == "" {
-			continue
-		}
-		rl := strings.ToLower(strings.TrimRight(r, `\/`))
-		if !contains(lower, rl) {
-			missing = append(missing, r)
-		}
+	merged := appendMissingPathEntries(os.Getenv("PATH"), registryPaths...)
+	merged = appendMissingPathEntries(merged, strings.Join(required, ";"))
+	if merged != os.Getenv("PATH") {
+		_ = os.Setenv("PATH", merged)
 	}
-	if len(missing) == 0 {
-		return
-	}
-
-	merged := strings.Join(append(parts, missing...), ";")
-	_ = os.Setenv("PATH", merged)
 }
 
-func contains(haystack []string, needle string) bool {
-	for _, h := range haystack {
-		if h == needle {
-			return true
+func registryPath(root registry.Key, path string) string {
+	key, err := registry.OpenKey(root, path, registry.QUERY_VALUE)
+	if err != nil {
+		return ""
+	}
+	defer key.Close()
+
+	value, valueType, err := key.GetStringValue("Path")
+	if err != nil || value == "" {
+		return ""
+	}
+	if valueType == registry.EXPAND_SZ {
+		if expanded, err := registry.ExpandString(value); err == nil {
+			return expanded
 		}
 	}
-	return false
+	return value
+}
+
+func appendMissingPathEntries(current string, additions ...string) string {
+	parts := strings.Split(current, ";")
+	seen := make(map[string]struct{}, len(parts))
+	for _, part := range parts {
+		if normalized := normalizePathEntry(part); normalized != "" {
+			seen[normalized] = struct{}{}
+		}
+	}
+
+	for _, addition := range additions {
+		for _, part := range strings.Split(addition, ";") {
+			part = strings.TrimSpace(part)
+			normalized := normalizePathEntry(part)
+			if normalized == "" {
+				continue
+			}
+			if _, exists := seen[normalized]; exists {
+				continue
+			}
+			parts = append(parts, part)
+			seen[normalized] = struct{}{}
+		}
+	}
+	return strings.Join(parts, ";")
+}
+
+func normalizePathEntry(path string) string {
+	return strings.ToLower(strings.TrimRight(strings.TrimSpace(path), `\/`))
 }

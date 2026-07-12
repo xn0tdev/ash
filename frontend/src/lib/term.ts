@@ -92,13 +92,23 @@ async function readClipboardReliable(): Promise<string> {
 
 /** Paste from the clipboard into pane `id`, marking the session used. Used by
  *  the Ctrl+V keybind and the right-click paste — the synchronous `paste`
- *  event listener (in attachRenderer) handles external paste dispatches. */
+ *  event listener (in attachRenderer) handles external paste dispatches.
+ *
+ *  Pastes go through `term.paste()` (not a raw ptyWrite) so xterm can wrap them
+ *  in bracketed-paste markers (\x1b[200~ … \x1b[201~) when the running app has
+ *  enabled DECSET 2004. CLI agents like Pi rely on this to show a pasted blob
+ *  as a single [PASTED TEXT] block instead of interpreting each line as a
+ *  separate input — without the markers, a multi-line paste gets fed to the
+ *  app one line at a time and can't be cancelled with Esc because the bytes
+ *  are already queued in the PTY. */
 function pasteFromClipboard(id: string): void {
   readClipboardReliable()
     .then((text) => {
       if (!text) return;
       used.add(id);
-      ptyWrite(id, text);
+      const term = getSession(id)?.term;
+      if (term) term.paste(text);
+      else ptyWrite(id, text); // headless session — no xterm to wrap, write raw
     })
     .catch(() => {});
 }
@@ -211,7 +221,7 @@ function wireAndSpawn(
   spawnOpts: SpawnOptions | undefined,
   cols: number,
   rows: number,
-) {
+): Promise<void> {
   // A terminal that starts by running something (utility, ssh, agent command)
   // is "used" from birth — only a bare shell counts as pristine.
   if (spawnOpts?.command || spawnOpts?.program) used.add(id);
@@ -254,15 +264,16 @@ function wireAndSpawn(
   });
   onPtyExit(id, () => events?.onExit(id));
 
-  ptySpawn(id, cols, rows, cwd, spawnOpts?.program ?? null, spawnOpts?.args ?? null)
-    .then((shell) => {
+  return ptySpawn(id, cols, rows, cwd, spawnOpts?.program ?? null, spawnOpts?.args ?? null)
+    .then(async (shell) => {
       events?.onShell(id, shell.replace(/\.exe$/i, ""));
       // Only shells get a typed command; a direct program (ssh) runs itself.
       if (spawnOpts?.command && !spawnOpts?.program)
-        ptyWrite(id, spawnOpts.command + "\r");
+        await ptyWrite(id, spawnOpts.command + "\r");
     })
     .catch((err) => {
       term.writeln(`\x1b[31mfailed to start:\x1b[0m ${err}`);
+      throw err;
     });
 }
 
@@ -364,7 +375,12 @@ function attachRenderer(session: TermSession, host: HTMLElement, useWebgl = true
         e.preventDefault();
         e.stopImmediatePropagation();
         used.add(id);
-        ptyWrite(id, text);
+        // Route through term.paste() so xterm applies bracketed-paste markers
+        // when the app (e.g. Pi) has enabled DECSET 2004 — a multi-line paste
+        // then arrives as one [PASTED TEXT] block, not line-by-line input that
+        // can't be cancelled with Esc. preventDefault + stopImmediatePropagation
+        // keep xterm's own textarea paste handler from also firing (no double).
+        term.paste(text);
       }
     },
     true, // capture: beat xterm's own paste handler (runs before the textarea target phase)
@@ -418,9 +434,11 @@ export function ensureSession(id: string, host: HTMLElement): TermSession {
     lastTitle: "",
   };
   attachRenderer(session, host);
-  // Spawn at the fitted size so the shell starts with the right geometry.
-  wireAndSpawn(id, term, spawnOpts, term.cols, term.rows);
+  // Register before spawning so an immediate PTY event can always find the
+  // session. A visible terminal keeps its rendered startup error for the user.
   sessions.set(id, session);
+  // Spawn at the fitted size so the shell starts with the right geometry.
+  void wireAndSpawn(id, term, spawnOpts, term.cols, term.rows).catch(() => {});
   return session;
 }
 
@@ -429,7 +447,7 @@ export function ensureSession(id: string, host: HTMLElement): TermSession {
 // read_terminal / wait_for_terminal read — but with NO WebGL: a fleet of WebGL
 // contexts is what froze the app ("not responding"), while the DOM renderer
 // buffers fine. Opening it in a pane later just re-parents the same container.
-export function ensureBackgroundSession(id: string): TermSession {
+export async function ensureBackgroundSession(id: string): Promise<TermSession> {
   const existing = sessions.get(id);
   if (existing) return existing;
 
@@ -451,10 +469,17 @@ export function ensureBackgroundSession(id: string): TermSession {
   host.style.cssText = "position:fixed;left:-10000px;top:0;width:900px;height:500px;overflow:hidden;";
   document.body.appendChild(host);
   attachRenderer(session, host, false);
-  // Spawn at the fitted size so the program lays out sensibly before it's viewed.
-  wireAndSpawn(id, term, spawnOpts, term.cols, term.rows);
+  // Register before spawning so output that arrives immediately isn't dropped.
   sessions.set(id, session);
-  return session;
+  // Unlike a user-visible terminal, a background tool must not claim success
+  // before its PTY exists: surface the actual startup error to the agent.
+  try {
+    await wireAndSpawn(id, term, spawnOpts, term.cols, term.rows);
+    return session;
+  } catch (error) {
+    disposeSession(id);
+    throw error;
+  }
 }
 
 /** Scroll a session's viewport to the bottom (safe before a renderer exists). */

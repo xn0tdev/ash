@@ -4,10 +4,9 @@ import { runProcess } from "./run-process";
 const DEFAULT_TIMEOUT_MS = 120_000;
 const MAX_OUTPUT = 12_000;
 
-// One shell across the whole app: the bash tool runs through the SAME PowerShell
-// the interactive/background terminals use (pty_spawn's default_shell), so the
-// agent never has to guess whether it's in bash, cmd, or PowerShell. (This is a
-// Windows/WebView2 app — default_shell only ever picks pwsh/powershell.)
+// One-shot PowerShell for work that finishes by itself. Background terminals
+// are persistent PTYs and may prefer pwsh, so the system prompt tells the model
+// to use syntax compatible with Windows PowerShell in both execution paths.
 export async function hasBash(): Promise<boolean> {
   return false;
 }
@@ -21,7 +20,7 @@ function cap(s: string): string {
 export const bashTool: Tool = {
   name: "bash",
   description:
-    "Run a shell command and return its combined stdout/stderr and exit code. Prefer this over asking the user to run commands manually.",
+    "Run one PowerShell command in the workspace and return its combined stdout/stderr and exit code. Each call is a fresh process; combine cd/env setup with the command when needed.",
   parameters: {
     type: "object",
     properties: {
@@ -39,6 +38,8 @@ export const bashTool: Tool = {
       ctx.cwd,
       { timeoutMs, signal: ctx.signal },
     );
+    if (res.cancelled)
+      return { ok: false, output: `Command cancelled.\n${cap(res.stdout + res.stderr)}`.trim() };
     if (res.timedOut)
       return { ok: false, output: `Command timed out after ${timeoutMs}ms.\n${cap(res.stdout + res.stderr)}` };
 

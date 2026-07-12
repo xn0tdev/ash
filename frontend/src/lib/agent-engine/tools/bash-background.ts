@@ -22,14 +22,30 @@ export const bashBackgroundTool: Tool = {
     required: ["command"],
   },
   async run(args, ctx) {
-    const command: string = args.command;
-    const title: string = (args.title ?? command).slice(0, 40);
+    const command = String(args.command ?? "").trim();
+    if (!command) return { ok: false, output: "command must be non-empty." };
+    if (ctx.signal.aborted) return { ok: false, output: "Cancelled." };
+
+    const title: string = String(args.title ?? command).slice(0, 40);
     const id = crypto.randomUUID();
 
     setSpawnOptions(id, { cwd: ctx.cwd, command });
     // Opens offscreen (no WebGL) so its buffer fills for read_terminal without a
     // fleet of WebGL contexts freezing the UI; re-parented into a pane on open.
-    ensureBackgroundSession(id);
+    try {
+      await ensureBackgroundSession(id);
+    } catch (error) {
+      return {
+        ok: false,
+        output: `Failed to start background terminal: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
+    if (ctx.signal.aborted) {
+      await ptyKill(id).catch(() => {});
+      disposeSession(id);
+      return { ok: false, output: "Cancelled." };
+    }
+
     addBackgroundTerm({ id, title, ownerId: ctx.ownerId });
     acquireTerminal(id, ctx.ownerId ?? "engine");
 
